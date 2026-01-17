@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Konno - Walking Character</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #1a1a1a;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 2px solid #333;
+            background: #0a0a0a;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 1200;
+        canvas.height = 800;
+        
+        // Zoom controls
+        let zoom = 1;
+        const minZoom = 0.5;
+        const maxZoom = 3;
+        const zoomStep = 0.1;
+
+        // Character object (Konno)
+        const character = {
+            // === CHARACTER POSITION (CHANGE THESE TO MOVE CHARACTER) ===
+            x: 400,        // ← Horizontal position (left/right on canvas)
+            y: 600,        // ← Starting vertical position (up/down on canvas)
+            groundY: 600,  // ← Ground level (where character stands)
+            // ===========================================================
+            
+            width: 128,     // ← Character width
+            height: 128,    // ← Character height
+            speed: 1.9, 
+            direction: 'right',
+            isMoving: false,
+            
+            // Jump properties
+            isJumping: false,
+            velocityY: 0,
+            jumpPower: 10,    // ← Jump height (higher = jumps higher)
+            gravity: 0.3,     // ← Gravity strength (higher = falls faster)
+            
+            walkFrameIndex: 0,
+            walkFrameDelay: 1.9, 
+            walkFrameCounter: 0,
+            
+            idleFrameIndex: 0,
+            idleFrameDelay: 3,
+            idleFrameCounter: 0,
+            
+            jumpFrameIndex: 0,
+            jumpFrameDelay: 3,
+            jumpFrameCounter: 0,
+            
+            walkFrames: [],  
+            idleFrames: [],
+            jumpFrames: []
+        };
+
+        // Background Object with Parallax
+        const background = {
+            frames: [],
+            frameIndex: 0,
+            frameDelay: 3,
+            frameCounter: 0,
+            x: 0,
+            parallaxSpeed: 0.3  // ← Background scroll speed
+        };
+
+        // ===== HELPER TO GENERATE FILE NAMES =====
+        function generateImageArray(prefix, count, folder) {
+            let arr = [];
+            for (let i = 1; i <= count; i++) {
+                let numStr = i.toString().padStart(3, '0');
+                arr.push(`${folder}${prefix}_${numStr}.png`);
+            }
+            return arr;
+        }
+
+        // === CONFIGURATION: UPDATE THESE NUMBERS TO MATCH YOUR FILES ===
+        const walkCount = 126;
+        const idleCount = 126;
+        const jumpCount = 50;   // ← Change this to match your jump frames
+        const bgCount = 122;
+        // ===============================================================
+
+        const walkRightSrcs = generateImageArray('walk_right', walkCount, 'walk/');
+        const idleSrcs = generateImageArray('Idle', idleCount, 'idle/');
+        const jumpSrcs = generateImageArray('jmp', jumpCount, 'jump/');
+        const bgSrcs = generateImageArray('bg', bgCount, 'background/');
+
+        // Load all images
+        function loadImages() {
+            // Load Walk images
+            walkRightSrcs.forEach(src => {
+                const img = new Image();
+                img.src = src;
+                character.walkFrames.push(img);
+            });
+            
+            // Load Idle images
+            idleSrcs.forEach(src => {
+                const img = new Image();
+                img.src = src;
+                character.idleFrames.push(img);
+            });
+
+            // Load Jump images
+            jumpSrcs.forEach(src => {
+                const img = new Image();
+                img.src = src;
+                character.jumpFrames.push(img);
+            });
+
+            // Load Background images
+            bgSrcs.forEach(src => {
+                const img = new Image();
+                img.src = src;
+                background.frames.push(img);
+            });
+            
+            // Set frame counts
+            character.walkFrameCount = character.walkFrames.length;
+            character.idleFrameCount = character.idleFrames.length;
+            character.jumpFrameCount = character.jumpFrames.length;
+            background.frameCount = background.frames.length;
+
+            console.log(`Attempting to load: ${walkCount} walk, ${idleCount} idle, ${jumpCount} jump, ${bgCount} background frames.`);
+        }
+
+        loadImages();
+
+        // Keyboard input
+        const keys = {};
+        
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            
+            // Jump with spacebar
+            if (e.key === ' ' && !character.isJumping) {
+                character.isJumping = true;
+                character.velocityY = -character.jumpPower;
+                character.jumpFrameIndex = 0; // Reset jump animation
+            }
+            
+            if (e.key === '+' || e.key === '=') zoom = Math.min(zoom + zoomStep, maxZoom);
+            if (e.key === '-' || e.key === '_') zoom = Math.max(zoom - zoomStep, minZoom);
+            if (e.key === '0') zoom = 1;
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+        
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (e.deltaY < 0) zoom = Math.min(zoom + zoomStep, maxZoom);
+            else zoom = Math.max(zoom - zoomStep, minZoom);
+        });
+
+        // Update function
+        function update() {
+            // 1. Jump Physics
+            if (character.isJumping) {
+                character.velocityY += character.gravity;
+                character.y += character.velocityY;
+                
+                // Land on ground
+                if (character.y >= character.groundY) {
+                    character.y = character.groundY;
+                    character.isJumping = false;
+                    character.velocityY = 0;
+                }
+            }
+
+            // 2. Character Movement Logic with Parallax
+            character.isMoving = false;
+
+            if (keys['a']) {
+                character.x -= character.speed;
+                character.direction = 'right';
+                character.isMoving = true;
+                background.x += character.speed * background.parallaxSpeed;
+                if (character.x < 0) character.x = 0;
+            }
+            
+            if (keys['d']) {
+                character.x += character.speed;
+                character.direction = 'left';
+                character.isMoving = true;
+                background.x -= character.speed * background.parallaxSpeed;
+                if (character.x > canvas.width - character.width) {
+                    character.x = canvas.width - character.width;
+                }
+            }
+
+            // 3. Character Animation Logic
+            if (character.isJumping) {
+                // Jump animation
+                character.jumpFrameCounter++;
+                if (character.jumpFrameCounter >= character.jumpFrameDelay) {
+                    character.jumpFrameCounter = 0;
+                    if (character.jumpFrameIndex < character.jumpFrameCount - 1) {
+                        character.jumpFrameIndex++;
+                    }
+                }
+            } else if (character.isMoving) {
+                // Walk animation
+                character.walkFrameCounter++;
+                if (character.walkFrameCounter >= character.walkFrameDelay) {
+                    character.walkFrameCounter = 0;
+                    character.walkFrameIndex = (character.walkFrameIndex + 1) % character.walkFrameCount;
+                }
+            } else {
+                // Idle animation
+                character.idleFrameCounter++;
+                if (character.idleFrameCounter >= character.idleFrameDelay) {
+                    character.idleFrameCounter = 0;
+                    character.idleFrameIndex = (character.idleFrameIndex + 1) % character.idleFrameCount;
+                }
+            }
+
+            // 4. Background Animation Logic
+            background.frameCounter++;
+            if (background.frameCounter >= background.frameDelay) {
+                background.frameCounter = 0;
+                background.frameIndex = (background.frameIndex + 1) % background.frameCount;
+            }
+        }
+
+        // Draw function
+        function draw() {
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(zoom, zoom);
+            ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+            // === LAYER 1: DRAW BACKGROUND WITH PARALLAX ===
+            let currentBgImage = background.frames[background.frameIndex];
+            
+            if (currentBgImage && currentBgImage.complete && currentBgImage.naturalHeight !== 0) {
+                let bgWidth = canvas.width;
+                let bgHeight = canvas.height;
+                let offsetX = background.x % bgWidth;
+                
+                ctx.drawImage(currentBgImage, offsetX - bgWidth, 0, bgWidth, bgHeight);
+                ctx.drawImage(currentBgImage, offsetX, 0, bgWidth, bgHeight);
+                ctx.drawImage(currentBgImage, offsetX + bgWidth, 0, bgWidth, bgHeight);
+            }
+
+            // === LAYER 2: DRAW CHARACTER ===
+            let currentImage;
+            if (character.isJumping) {
+                currentImage = character.jumpFrames[character.jumpFrameIndex];
+            } else if (character.isMoving) {
+                currentImage = character.walkFrames[character.walkFrameIndex];
+            } else {
+                currentImage = character.idleFrames[character.idleFrameIndex];
+            }
+
+            if (currentImage && currentImage.complete && currentImage.naturalHeight !== 0) {
+                if (character.direction === 'left') {
+                    ctx.save();
+                    ctx.translate(character.x + character.width / 2, 0); 
+                    ctx.scale(-1, 1); 
+                    ctx.translate(-(character.x + character.width / 2), 0);
+                    ctx.drawImage(currentImage, character.x, character.y, character.width, character.height);
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(currentImage, character.x, character.y, character.width, character.height);
+                }
+            } else {
+                // Fallback Character Box
+                ctx.fillStyle = character.isJumping ? '#FF5722' : '#4CAF50'; 
+                ctx.fillRect(character.x, character.y, character.width, character.height);
+                ctx.fillStyle = '#fff';
+                let eyeOffset = character.direction === 'left' ? 12 : 44;
+                ctx.beginPath();
+                ctx.arc(character.x + eyeOffset, character.y + 20, 8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+
+            // UI Info
+            ctx.fillStyle = '#888';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('A : Move Left', 20, 30);
+            ctx.fillText('D : Move Right', 20, 50);
+            ctx.fillText('SPACE : Jump', 20, 70);
+            ctx.fillText('Scroll / +/- : Zoom (' + zoom.toFixed(1) + 'x)', 20, 100);
+            
+            let stateText = character.isJumping ? "State: Jumping" : (character.isMoving ? "State: Walking" : "State: Idle");
+            ctx.fillStyle = character.isJumping ? '#FF5722' : (character.isMoving ? '#4CAF50' : '#FFC107');
+            ctx.fillText(stateText, 20, 130);
+            
+            // Frame Debug Info
+            ctx.fillStyle = '#555';
+            ctx.font = '12px Arial';
+            ctx.fillText(`BG Frame: ${background.frameIndex + 1} / ${bgCount}`, 20, 160);
+            ctx.fillText(`Position: X=${Math.round(character.x)}, Y=${Math.round(character.y)}`, 20, 180);
+        }
+
+        // Game Loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
