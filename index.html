@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Konno - Walking Character</title>
+    <title>Konno - Walking Character + Planting (Fixed Turbo Retain Direction)</title>
     <style>
         body {
             margin: 0;
@@ -31,301 +31,253 @@
         canvas.width = 1200;
         canvas.height = 800;
         
-        // Zoom controls
         let zoom = 1;
         const minZoom = 0.5;
         const maxZoom = 3;
         const zoomStep = 0.1;
+
+        // ==========================================
+        // === TURBO BOOST CONTROLS =================
+        // ==========================================
+        const turboBoostWidthScale = 4.6;
+        const turboBoostHeightScale = 0.55;
+        const turboBoostOffsetX = -303; 
+        const turboBoostOffsetY = 13;  
+        const turboBoostRotationAngle = -8; 
+
+        const turboCharWidthScale = 1.0;
+        const turboCharHeightScale = 1.0;
+        const turboCharOffsetX = 0;      
+        const turboCharOffsetY = -15;      
+        const turboCharRotationAngle = 24; 
+        // ==========================================
         
-        // Character object (Konno)
+        let showUI = true;
+        
+        const plantCount = 214; 
+        const treeCount = 122;
+        const newTreeCount = 122;
+        const turboBoostCount = 80;
+
         const character = {
-            // === CHARACTER POSITION ===
-            x: 400,
-            y: 600,
-            groundY: 600,
-            // ===========================
-            
-            width: 128,
-            height: 128,
-            speed: 0.3,         // ← Normal walking speed
-            floatSpeed: 0.9,    // ← Speed while floating (Left/Right)
-            
-            // Horizontal Boost/Turbo Speeds (Still uses multipliers for left/right)
-            boostMultiplier: 1,
-            turboMultiplier: 5,
-            
-            direction: 'left',
-            isMoving: false,
-            
-            // Jump properties
-            isJumping: false,
-            velocityY: 0,
-            jumpPower: 10,
-            gravity: 0.3,
-            
-            // Glowing properties
-            isGlowing: false,
-            
-            // Flying properties
-            isFloating: false,
-            isFlyingUp: false,
-            isFlyingDown: false,
-            isLanding: false,
-            
-            // Boost properties
-            isBoost: false,
-            isTurbo: false,
-            boostStartTime: 0,
-            boostDuration: 1500,
-            
-            // === VERTICAL SPEED CONTROLS ===
-            // Normal
-            flyUpSpeed: 2.1,          // Normal Up Speed (W key)
-            flyDownSpeed: 2.1,        // Normal Down Speed (S key)
-            
-            // Boost (Shift)
-            flyUpSpeedBoost: 1.5,     // Up Speed while Boosting
-            flyDownSpeedBoost: 1.5,   // Down Speed while Boosting
-            
-            // Turbo (Hold Shift 3 sec)
-            flyUpSpeedTurbo: 3.0,    // Up Speed while Turbo
-            flyDownSpeedTurbo: 3.0,  // Down Speed while Turbo
-            
-            flyTargetY: 200,
-            
-            walkFrameIndex: 0,
-            walkFrameDelay: 0.3, 
-            walkFrameCounter: 0,
-            
-            idleFrameIndex: 0,
-            idleFrameDelay: 3,
-            idleFrameCounter: 0,
-            
-            jumpFrameIndex: 0,
-            jumpFrameDelay: 3,
-            jumpFrameCounter: 0,
-            
-            glowingFrameIndex: 0,
-            glowingFrameDelay: 2,
-            glowingFrameCounter: 0,
-            
-            floatFrameIndex: 0,
-            floatFrameDelay: 0.7,
-            floatFrameCounter: 0,
-            
-            flyUpFrameIndex: 0,
-            flyUpFrameDelay: 0.5,
-            flyUpFrameCounter: 0,
-            
-            flyDownFrameIndex: 0,
-            flyDownFrameDelay: 0.5,
-            flyDownFrameCounter: 0,
-            
-            landFrameIndex: 0,
-            landFrameDelay: 0.5,
-            landFrameCounter: 0,
-            
-            boostFrameIndex: 0,
-            boostFrameDelay: 0.3,
-            boostFrameCounter: 0,
-            
-            turboFrameIndex: 0,
-            turboFrameDelay: 0.3,
-            turboFrameCounter: 0,
-            
-            walkFrames: [],  
-            idleFrames: [],
-            jumpFrames: [],
-            glowingFrames: [],
-            floatFrames: [],
-            flyUpFrames: [],
-            flyDownFrames: [],
-            landFrames: [],
-            boostFrames: [],
-            turboFrames: []
+            x: 400, y: 600, groundY: 600,
+            width: 128, height: 128,
+            speed: 0.3, floatSpeed: 0.9,
+            boostMultiplier: 1, turboMultiplier: 5,
+            direction: 'right', isMoving: false,
+            isJumping: false, velocityY: 0, jumpPower: 10, gravity: 0.3,
+            isGlowing: false, isFloating: false, isFlyingUp: false, isFlyingDown: false, isLanding: false,
+            isBoost: false, isTurbo: false, boostStartTime: 0, boostDuration: 1500,
+            flyUpSpeed: 2.1, flyDownSpeed: 2.1,
+            flyUpSpeedBoost: 1.5, flyDownSpeedBoost: 1.5,
+            flyUpSpeedTurbo: 3.0, flyDownSpeedTurbo: 3.0,
+            walkFrameIndex: 0, walkFrameDelay: 0.3, walkFrameCounter: 0,
+            idleFrameIndex: 0, idleFrameDelay: 3, idleFrameCounter: 0,
+            jumpFrameIndex: 0, jumpFrameDelay: 3, jumpFrameCounter: 0,
+            glowingFrameIndex: 0, glowingFrameDelay: 2, glowingFrameCounter: 0,
+            floatFrameIndex: 0, floatFrameDelay: 0.7, floatFrameCounter: 0,
+            flyUpFrameIndex: 0, flyUpFrameDelay: 0.5, flyUpFrameCounter: 0,
+            flyDownFrameIndex: 0, flyDownFrameDelay: 0.5, flyDownFrameCounter: 0,
+            landFrameIndex: 0, landFrameDelay: 0.5, landFrameCounter: 0,
+            boostFrameIndex: 0, boostFrameDelay: 0.3, boostFrameCounter: 0,
+            turboFrameIndex: 0, turboFrameDelay: 0.3, turboFrameCounter: 0,
+            turboBoostFrameIndex: 0, turboBoostFrameDelay: 0.3, turboBoostFrameCounter: 0,
+            walkFrames: [], idleFrames: [], jumpFrames: [], glowingFrames: [],
+            floatFrames: [], flyUpFrames: [], flyDownFrames: [], landFrames: [],
+            boostFrames: [], turboFrames: [], turboBoostFrames: []
         };
-        
-        // Background Object with Parallax
+
+        let worldObjects = [];
+        const plantFrames = [];
+        const newTreeFrames = [];
+
         const background = {
-            frames: [],
-            frameIndex: 0,
-            frameDelay: 3,
-            frameCounter: 0,
-            x: 0,
-            parallaxSpeed: 15
+            frames: [], frameIndex: 0, frameDelay: 3, frameCounter: 0,
+            x: 0, y: 0, parallaxSpeed: 15, verticalParallaxSpeed: 8
         };
         
-        // ===== HELPER TO GENERATE FILE NAMES =====
+        const treeLayer = {
+            frames: [], frameIndex: 0, frameDelay: 3, frameCounter: 0,
+            x: 0, y: 0, parallaxSpeed: 25, verticalParallaxSpeed: 12
+        };
+        
+        const newBackgroundLayer = {
+            frames: [], frameIndex: 0, frameDelay: 3, frameCounter: 0,
+            x: 0, y: 0, parallaxSpeed: 35, verticalParallaxSpeed: 16
+        };
+        
+        const newBackground2Layer = {
+            frames: [], frameIndex: 0, frameDelay: 3, frameCounter: 0,
+            x: 0, y: 0, parallaxSpeed: 35, verticalParallaxSpeed: 16
+        };
+        
         function generateImageArray(prefix, count, folder) {
             let arr = [];
             for (let i = 1; i <= count; i++) {
-                let numStr = i.toString().padStart(3, '0');
-                arr.push(`${folder}${prefix}_${numStr}.png`);
+                arr.push(`${folder}${prefix}_${i.toString().padStart(3, '0')}.png`);
             }
             return arr;
         }
         
-        // === CONFIGURATION: UPDATE THESE NUMBERS TO MATCH YOUR FILES ===
-        const walkCount = 126;
-        const idleCount = 126;
-        const jumpCount = 50;
-        const glowingCount = 50;
-        const floatCount = 42;
-        const flyUpCount = 30;
-        const flyDownCount = 30;
-        const landCount = 110;
-        const boostCount = 96;
-        const turboCount = 77;
-        const bgCount = 122;
-        // ===============================================================
+        const walkCount = 126, idleCount = 126, jumpCount = 50, glowingCount = 50;
+        const floatCount = 42, flyUpCount = 30, flyDownCount = 30, landCount = 110;
+        const boostCount = 96, turboCount = 77, bgCount = 122, newBackgroundCount = 122;
         
-        const walkRightSrcs = generateImageArray('walk_right', walkCount, 'walk/');
-        const idleSrcs = generateImageArray('Idle', idleCount, 'idle/');
-        const jumpSrcs = generateImageArray('jmp', jumpCount, 'jump/');
-        const glowingSrcs = generateImageArray('glowing', glowingCount, 'glowing/');
-        const floatSrcs = generateImageArray('float', floatCount, 'float/');
-        const flyUpSrcs = generateImageArray('higher', flyUpCount, 'higher/');
-        const flyDownSrcs = generateImageArray('fly_down', flyDownCount, 'fly_down/');
-        const landSrcs = generateImageArray('land', landCount, 'land/');
-        const boostSrcs = generateImageArray('boost_speed', boostCount, 'boost_speed/');
-        const turboSrcs = generateImageArray('turbo', turboCount, 'turbo/');
-        const bgSrcs = generateImageArray('bg', bgCount, 'background/');
+        const srcs = {
+            walk: generateImageArray('walk_right', walkCount, 'walk/'),
+            idle: generateImageArray('Idle', idleCount, 'idle/'),
+            jump: generateImageArray('jmp', jumpCount, 'jump/'),
+            glowing: generateImageArray('glowing', glowingCount, 'glowing/'),
+            float: generateImageArray('float', floatCount, 'float/'),
+            flyUp: generateImageArray('higher', flyUpCount, 'higher/'),
+            flyDown: generateImageArray('fly_down', flyDownCount, 'fly_down/'),
+            land: generateImageArray('land', landCount, 'land/'),
+            boost: generateImageArray('boost_speed', boostCount, 'boost_speed/'),
+            turbo: generateImageArray('turbo', turboCount, 'turbo/'),
+            turboBoost: generateImageArray('turbo_boost', turboBoostCount, 'turbo_boost/'),
+            bg: generateImageArray('bg', bgCount, 'background/'),
+            tree: generateImageArray('tree', treeCount, 'tree/'),
+            newBackground: generateImageArray('newBackground', newBackgroundCount, 'newBackground/'),
+            plant: generateImageArray('plant', plantCount, 'plant/'),
+            newTree: generateImageArray('new_tree', newTreeCount, 'new_tree/')
+        };
         
-        // Load all images
         function loadImages() {
-            walkRightSrcs.forEach(src => {
-                const img = new Image();
-                img.src = src;
-                character.walkFrames.push(img);
-            });
-            idleSrcs.forEach(src => {
-                const img = new Image();
-                img.src = src;
-                character.idleFrames.push(img);
-            });
-            jumpSrcs.forEach(src => {
-                const img = new Image();
-                img.src = src;
-                character.jumpFrames.push(img);
-            });
-            glowingSrcs.forEach(src => {
-                const img = new Image();
-                img.src = src;
-                character.glowingFrames.push(img);
-            });
-            floatSrcs.forEach(src => {
-                const img = new Image();
-                img.src = src;
-                character.floatFrames.push(img);
-            });
-            flyUpSrcs.forEach(src => {
-                const img = new Image();
-                img.src = src;
-                character.flyUpFrames.push(img);
-            });
-            flyDownSrcs.forEach(src => {
-                const img = new Image();
-                img.src = src;
-                character.flyDownFrames.push(img);
-            });
-            landSrcs.forEach(src => {
-                const img = new Image();
-                img.src = src;
-                character.landFrames.push(img);
-            });
-            boostSrcs.forEach(src => {
-                const img = new Image();
-                img.src = src;
-                character.boostFrames.push(img);
-            });
-            turboSrcs.forEach(src => {
-                const img = new Image();
-                img.src = src;
-                character.turboFrames.push(img);
-            });
-            bgSrcs.forEach(src => {
-                const img = new Image();
-                img.src = src;
-                background.frames.push(img);
-            });
+            const loadSet = (srcArray, targetArray) => {
+                srcArray.forEach(src => {
+                    const img = new Image();
+                    img.src = src;
+                    targetArray.push(img);
+                });
+            };
             
-            character.walkFrameCount = character.walkFrames.length;
-            character.idleFrameCount = character.idleFrames.length;
-            character.jumpFrameCount = character.jumpFrames.length;
-            character.glowingFrameCount = character.glowingFrames.length;
-            character.floatFrameCount = character.floatFrames.length;
-            character.flyUpFrameCount = character.flyUpFrames.length;
-            character.flyDownFrameCount = character.flyDownFrames.length;
-            character.landFrameCount = character.landFrames.length;
-            character.boostFrameCount = character.boostFrames.length;
-            character.turboFrameCount = character.turboFrames.length;
-            background.frameCount = background.frames.length;
-            console.log(`Attempting to load: ${walkCount} walk, ${idleCount} idle, ${jumpCount} jump, ${glowingCount} glowing, ${floatCount} float, ${flyUpCount} flyUp, ${flyDownCount} flyDown, ${landCount} land, ${boostCount} boost, ${turboCount} turbo, ${bgCount} background frames.`);
+            loadSet(srcs.walk, character.walkFrames);
+            loadSet(srcs.idle, character.idleFrames);
+            loadSet(srcs.jump, character.jumpFrames);
+            loadSet(srcs.glowing, character.glowingFrames);
+            loadSet(srcs.float, character.floatFrames);
+            loadSet(srcs.flyUp, character.flyUpFrames);
+            loadSet(srcs.flyDown, character.flyDownFrames);
+            loadSet(srcs.land, character.landFrames);
+            loadSet(srcs.boost, character.boostFrames);
+            loadSet(srcs.turbo, character.turboFrames);
+            loadSet(srcs.turboBoost, character.turboBoostFrames);
+            loadSet(srcs.bg, background.frames);
+            loadSet(srcs.tree, treeLayer.frames);
+            loadSet(srcs.newBackground, newBackgroundLayer.frames);
+            loadSet(srcs.newBackground, newBackground2Layer.frames);
+            loadSet(srcs.plant, plantFrames);
+            loadSet(srcs.newTree, newTreeFrames);
+            
+            character.walkFrameCount = walkCount;
+            character.idleFrameCount = idleCount;
+            character.jumpFrameCount = jumpCount;
+            character.glowingFrameCount = glowingCount;
+            character.floatFrameCount = floatCount;
+            character.flyUpFrameCount = flyUpCount;
+            character.flyDownFrameCount = flyDownCount;
+            character.landFrameCount = landCount;
+            character.boostFrameCount = boostCount;
+            character.turboFrameCount = turboCount;
+            character.turboBoostFrameCount = turboBoostCount;
+            background.frameCount = bgCount;
+            treeLayer.frameCount = treeCount;
+            newBackgroundLayer.frameCount = newBackgroundCount;
+            newBackground2Layer.frameCount = newBackgroundCount;
         }
         loadImages();
         
-        // Keyboard input
         const keys = {};
         
         window.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
             
-            // === SPACEBAR LOGIC: Jump -> Float -> Land -> (Cancel to Float) ===
-            if (e.key === ' ') {
-                if (!character.isGlowing) {
-                    
-                    // 1. If LANDING, Press Space to cancel landing and go back to FLOATING
-                    if (character.isLanding) {
-                        character.isLanding = false;
-                        character.velocityY = 0; // Stop gravity
-                        character.isFloating = true;
-                        character.floatFrameIndex = 0;
-                    }
-                    // 2. Start Jump (if on ground, idle, or walking)
-                    else if (!character.isJumping && !character.isFloating && !character.isFlyingUp && !character.isFlyingDown) {
-                        character.isJumping = true;
-                        character.velocityY = -character.jumpPower;
-                        character.jumpFrameIndex = 0;
-                    } 
-                    // 3. Jump -> Float (If already jumping)
-                    else if (character.isJumping) {
-                        character.isJumping = false;
-                        character.velocityY = 0; // Stop gravity
-                        character.isFloating = true;
-                        character.floatFrameIndex = 0;
-                    } 
-                    // 4. Float -> Land (If currently floating, flying up, or flying down)
-                    else if (character.isFloating || character.isFlyingUp || character.isFlyingDown) {
-                        character.isFloating = false;
-                        character.isFlyingUp = false;
-                        character.isFlyingDown = false;
-                        character.isLanding = true;
-                        character.landFrameIndex = 0;
-                    }
+            if (e.key.toLowerCase() === 'p') {
+                const depthLayer = Math.floor(Math.random() * 3);
+                const scales = [0.4, 0.7, 1.0, 1.3, 1.6];
+                const treeScale = scales[Math.floor(Math.random() * scales.length)];
+                const yOffsets = [-150, -50, 0];
+                const yOffset = yOffsets[depthLayer];
+                const xVariance = (Math.random() - 0.5) * 100;
+                
+                worldObjects.push({
+                    x: character.x + character.width / 2 + xVariance,
+                    y: character.groundY + yOffset,
+                    state: 'growing',
+                    type: 'animated-tree',
+                    frameIndex: 0,
+                    frameCounter: 0,
+                    frameDelay: 7,
+                    plantScale: 1.0,
+                    treeScale: treeScale,
+                    depthLayer: depthLayer,
+                    parallaxMultiplier: 1 - (depthLayer * 0.3)
+                });
+            }
+            
+            if (e.key.toLowerCase() === 'o') {
+                const depthLayer = Math.floor(Math.random() * 3);
+                const scales = [0.4, 0.7, 1.0, 1.3, 1.6];
+                const treeScale = scales[Math.floor(Math.random() * scales.length)];
+                const yOffsets = [-150, -50, 0];
+                const yOffset = yOffsets[depthLayer];
+                const xVariance = (Math.random() - 0.5) * 100;
+                
+                worldObjects.push({
+                    x: character.x + character.width / 2 + xVariance,
+                    y: character.groundY + yOffset,
+                    state: 'growing-new-tree',
+                    type: 'new-tree',
+                    frameIndex: 0,
+                    frameCounter: 0,
+                    frameDelay: 7,
+                    treeScale: treeScale,
+                    depthLayer: depthLayer,
+                    parallaxMultiplier: 1 - (depthLayer * 0.3)
+                });
+            }
+
+            if (e.key === ' ' && !character.isGlowing) {
+                if (character.isLanding) {
+                    character.isLanding = false;
+                    character.velocityY = 0;
+                    character.isFloating = true;
+                    character.floatFrameIndex = 0;
+                } else if (!character.isJumping && !character.isFloating && !character.isFlyingUp && !character.isFlyingDown) {
+                    character.isJumping = true;
+                    character.velocityY = -character.jumpPower;
+                    character.jumpFrameIndex = 0;
+                } else if (character.isJumping) {
+                    character.isJumping = false;
+                    character.velocityY = 0;
+                    character.isFloating = true;
+                    character.floatFrameIndex = 0;
+                } else if (character.isFloating || character.isFlyingUp || character.isFlyingDown) {
+                    character.isFloating = false;
+                    character.isFlyingUp = false;
+                    character.isFlyingDown = false;
+                    character.isLanding = true;
+                    character.landFrameIndex = 0;
                 }
             }
             
-            // Glowing with G key
             if (e.key.toLowerCase() === 'g' && !character.isGlowing && !character.isJumping && !character.isFloating && !character.isLanding) {
                 character.isGlowing = true;
                 character.glowingFrameIndex = 0;
             }
             
-            // Fly Up animation with W key (only when floating)
             if (e.key.toLowerCase() === 'w' && character.isFloating && !character.isFlyingUp && !character.isFlyingDown) {
                 character.isFlyingUp = true;
                 character.isFloating = false;
                 character.flyUpFrameIndex = 0;
             }
             
-            // Fly Down animation with S key (only when floating)
             if (e.key.toLowerCase() === 's' && character.isFloating && !character.isFlyingDown && !character.isFlyingUp) {
                 character.isFlyingDown = true;
                 character.isFloating = false;
                 character.flyDownFrameIndex = 0;
             }
             
-            // Boost/Turbo mode with Shift
             if (e.key === 'Shift' && (character.isFloating || character.isFlyingUp || character.isFlyingDown) && !character.isBoost && !character.isTurbo && (keys['a'] || keys['d'])) {
                 character.isBoost = true;
                 character.boostStartTime = Date.now();
@@ -335,33 +287,33 @@
             if (e.key === '+' || e.key === '=') zoom = Math.min(zoom + zoomStep, maxZoom);
             if (e.key === '-' || e.key === '_') zoom = Math.max(zoom - zoomStep, minZoom);
             if (e.key === '0') zoom = 1;
+            
+            if (e.key.toLowerCase() === 'h') {
+                showUI = !showUI;
+                console.log('UI toggle:', showUI);
+            }
         });
         
         window.addEventListener('keyup', (e) => {
             keys[e.key.toLowerCase()] = false;
             
-            // === CHANGE HERE: Release Shift forces Landing ===
             if (e.key === 'Shift' && (character.isBoost || character.isTurbo)) {
                 character.isBoost = false;
                 character.isTurbo = false;
                 character.isFloating = false;
                 character.isFlyingUp = false;
                 character.isFlyingDown = false;
-                
-                // Force landing state
                 character.isLanding = true;
                 character.landFrameIndex = 0;
                 character.boostStartTime = 0;
             }
             
-            // When W is released during fly up animation, return to floating
             if (e.key.toLowerCase() === 'w' && character.isFlyingUp) {
                 character.isFlyingUp = false;
                 character.isFloating = true;
                 character.floatFrameIndex = 0;
             }
             
-            // When S is released during fly_down animation, return to floating
             if (e.key.toLowerCase() === 's' && character.isFlyingDown) {
                 character.isFlyingDown = false;
                 character.isFloating = true;
@@ -375,62 +327,77 @@
             else zoom = Math.max(zoom - zoomStep, minZoom);
         });
         
-        // Update function
         function update() {
-            // Check if boost should transition to turbo
-            if (character.isBoost && !character.isTurbo && (keys['shift']) && (keys['a'] || keys['d'])) {
-                const elapsedTime = Date.now() - character.boostStartTime;
-                if (elapsedTime >= character.boostDuration) {
+            if (character.isBoost && !character.isTurbo && keys['shift'] && (keys['a'] || keys['d'])) {
+                const elapsed = Date.now() - character.boostStartTime;
+                if (elapsed >= character.boostDuration) {
                     character.isBoost = false;
                     character.isTurbo = true;
                     character.turboFrameIndex = 0;
+                    character.turboBoostFrameIndex = 0;
                 }
             }
             
-            // === SPEED LOGIC ===
-            // Determine base horizontal speed based on state
-            let baseSpeed = character.speed;
+            let baseSpeed = (character.isFloating || character.isFlyingUp || character.isFlyingDown) ? character.floatSpeed : character.speed;
+            const currentSpeed = character.isTurbo ? baseSpeed * character.turboMultiplier : (character.isBoost ? baseSpeed * character.boostMultiplier : baseSpeed);
             
-            // If we are in any flight state (Float, FlyUp, FlyDown), use the faster float speed
-            if (character.isFloating || character.isFlyingUp || character.isFlyingDown) {
-                baseSpeed = character.floatSpeed;
-            }
-
-            // Calculate current horizontal Speed (still uses multipliers)
-            const currentSpeed = character.isTurbo ? baseSpeed * character.turboMultiplier : 
-                                (character.isBoost ? baseSpeed * character.boostMultiplier : baseSpeed);
-
-            // === VERTICAL SPEED LOGIC (SEPARATED FROM MULTIPLIERS) ===
-            let currentFlyUpSpeed, currentFlyDownSpeed;
-
+            let flyUpSpeed = character.flyUpSpeed, flyDownSpeed = character.flyDownSpeed;
             if (character.isTurbo) {
-                currentFlyUpSpeed = character.flyUpSpeedTurbo;
-                currentFlyDownSpeed = character.flyDownSpeedTurbo;
+                flyUpSpeed = character.flyUpSpeedTurbo;
+                flyDownSpeed = character.flyDownSpeedTurbo;
             } else if (character.isBoost) {
-                currentFlyUpSpeed = character.flyUpSpeedBoost;
-                currentFlyDownSpeed = character.flyDownSpeedBoost;
-            } else {
-                currentFlyUpSpeed = character.flyUpSpeed;
-                currentFlyDownSpeed = character.flyDownSpeed;
-            }
-
-            // === FIXED PARALLAX SPEED LOGIC ===
-            // We decouple the parallax factor from the character's movement multiplier.
-            // The character already moves faster (currentSpeed is higher), so the background moves faster naturally.
-            // We use slightly higher parallax factors for Boost/Turbo for visual effect, but not the raw 3x/10x multipliers which caused the scrolling to glitch.
-            let currentParallaxSpeed = background.parallaxSpeed; // Base is 15
-            if (character.isTurbo) {
-                currentParallaxSpeed = 30; 
-            } else if (character.isBoost) {
-                currentParallaxSpeed = 20;
+                flyUpSpeed = character.flyUpSpeedBoost;
+                flyDownSpeed = character.flyDownSpeedBoost;
             }
             
-            // 1. Physics for Jumping
+            let bgParallax = background.parallaxSpeed, treeParallax = treeLayer.parallaxSpeed, newBackgroundParallax = newBackgroundLayer.parallaxSpeed;
+            let bgVerticalParallax = background.verticalParallaxSpeed, treeVerticalParallax = treeLayer.verticalParallaxSpeed, newBackgroundVerticalParallax = newBackgroundLayer.verticalParallaxSpeed;
+            
+            if (character.isTurbo) {
+                bgParallax = 30; treeParallax = 40; newBackgroundParallax = 50;
+                bgVerticalParallax = 15; treeVerticalParallax = 20; newBackgroundVerticalParallax = 25;
+            } else if (character.isBoost) {
+                bgParallax = 20; treeParallax = 30; newBackgroundParallax = 40;
+                bgVerticalParallax = 12; treeVerticalParallax = 16; newBackgroundVerticalParallax = 20;
+            }
+            
+            worldObjects.sort((a, b) => a.depthLayer - b.depthLayer);
+            
+            for (let i = 0; i < worldObjects.length; i++) {
+                let obj = worldObjects[i];
+                const parallaxFactor = obj.parallaxMultiplier || 1;
+                if (keys['a']) obj.x += currentSpeed * treeParallax * parallaxFactor;
+                if (keys['d']) obj.x -= currentSpeed * treeParallax * parallaxFactor;
+
+                obj.frameCounter++;
+                if (obj.frameCounter >= obj.frameDelay) {
+                    obj.frameCounter = 0;
+
+                    if (obj.state === 'growing') {
+                        obj.frameIndex++;
+                        if (obj.frameIndex >= plantCount) {
+                            obj.state = 'grown';
+                            obj.frameIndex = 0;
+                            obj.frameDelay = 3;
+                        }
+                    } else if (obj.state === 'growing-new-tree') {
+                        obj.frameIndex++;
+                        if (obj.frameIndex >= newTreeCount) {
+                            obj.state = 'grown-new-tree';
+                            obj.frameIndex = 0;
+                            obj.frameDelay = 3;
+                        }
+                    } else if (obj.state === 'grown') {
+                        obj.frameIndex = (obj.frameIndex + 1) % treeCount;
+                    } else if (obj.state === 'grown-new-tree') {
+                        obj.frameIndex = (obj.frameIndex + 1) % newTreeCount;
+                    }
+                }
+            }
+
             if (character.isJumping) {
                 character.velocityY += character.gravity;
                 character.y += character.velocityY;
-                
-                // If we hit the ground while jumping (normal landing)
                 if (character.y >= character.groundY) {
                     character.y = character.groundY;
                     character.isJumping = false;
@@ -438,84 +405,64 @@
                 }
             }
             
-            // 2. Physics for Floating / Flying States
-            if (character.isFloating) {
-                // Just hover, W and S change the state to isFlyingUp / isFlyingDown
-            } 
-            else if (character.isFlyingUp) {
-                // Move character upward
-                character.y -= currentFlyUpSpeed;
+            if (character.isFlyingUp) {
+                character.y -= flyUpSpeed;
                 if (character.y < 0) character.y = 0;
-            } 
-            else if (character.isFlyingDown) {
-                // Move character downward
-                character.y += currentFlyDownSpeed;
+            } else if (character.isFlyingDown) {
+                character.y += flyDownSpeed;
                 if (character.y > character.groundY) character.y = character.groundY;
             }
             
-            // Handle W/S movement specifically for Boost/Turbo states (if not using anims)
-            if ((character.isBoost || character.isTurbo) && !character.isFlyingUp && !character.isFlyingDown && (character.isFloating || character.isFlyingUp || character.isFlyingDown)) {
-                 if (keys['w']) {
-                     character.y -= currentFlyUpSpeed;
-                     if (character.y < 0) character.y = 0;
-                 }
-                 if (keys['s']) {
-                     character.y += currentFlyDownSpeed;
-                     if (character.y > character.groundY) character.y = character.groundY;
-                 }
-            }
-
-            // 3. Physics for Landing
-            if (character.isLanding) {
-                character.velocityY += character.gravity * 0.5;
-                character.y += character.velocityY;
-                
-                if (character.y >= character.groundY) {
-                    character.y = character.groundY;
-                    character.velocityY = 0;
-                    // Animation logic handles the boolean reset when frame finishes
+            if ((character.isBoost || character.isTurbo) && !character.isFlyingUp && !character.isFlyingDown) {
+                if (keys['w']) {
+                    character.y -= flyUpSpeed;
+                    if (character.y < 0) character.y = 0;
+                }
+                if (keys['s']) {
+                    character.y += flyDownSpeed;
+                    if (character.y > character.groundY) character.y = character.groundY;
                 }
             }
             
-            // 4. Character Movement Logic with Parallax
+            if (character.isLanding) {
+                character.velocityY += character.gravity * 0.5;
+                character.y += character.velocityY;
+                if (character.y >= character.groundY) {
+                    character.y = character.groundY;
+                    character.velocityY = 0;
+                }
+            }
+            
             character.isMoving = false;
             if (!character.isGlowing) {
                 if (keys['a']) {
                     character.x -= currentSpeed;
                     character.direction = 'left';
                     character.isMoving = true;
-                    background.x += currentSpeed * currentParallaxSpeed;
+                    background.x += currentSpeed * bgParallax;
+                    treeLayer.x += currentSpeed * treeParallax;
                     if (character.x < 0) character.x = 0;
                 }
-                
                 if (keys['d']) {
                     character.x += currentSpeed;
                     character.direction = 'right';
                     character.isMoving = true;
-                    background.x -= currentSpeed * currentParallaxSpeed;
-                    if (character.x > canvas.width - character.width) {
-                        character.x = canvas.width - character.width;
-                    }
+                    background.x -= currentSpeed * bgParallax;
+                    treeLayer.x -= currentSpeed * treeParallax;
+                    if (character.x > canvas.width - character.width) character.x = canvas.width - character.width;
                 }
             }
             
-            // Update direction in boost/turbo mode
-            if (character.isBoost || character.isTurbo) {
-                if (keys['a']) character.direction = 'right';
-                if (keys['d']) character.direction = 'left';
-            }
-            
-            // 5. Character Animation Logic
             if (character.isLanding) {
                 character.landFrameCounter++;
                 if (character.landFrameCounter >= character.landFrameDelay) {
                     character.landFrameCounter = 0;
                     character.landFrameIndex++;
-                    
                     if (character.landFrameIndex >= character.landFrameCount) {
                         character.isLanding = false;
                         character.landFrameIndex = 0;
                         character.velocityY = 0;
+                        character.idleFrameIndex = 0;
                     }
                 }
             } else if (character.isTurbo) {
@@ -523,6 +470,11 @@
                 if (character.turboFrameCounter >= character.turboFrameDelay) {
                     character.turboFrameCounter = 0;
                     character.turboFrameIndex = (character.turboFrameIndex + 1) % character.turboFrameCount;
+                }
+                character.turboBoostFrameCounter++;
+                if (character.turboBoostFrameCounter >= character.turboBoostFrameDelay) {
+                    character.turboBoostFrameCounter = 0;
+                    character.turboBoostFrameIndex = (character.turboBoostFrameIndex + 1) % character.turboBoostFrameCount;
                 }
             } else if (character.isBoost) {
                 character.boostFrameCounter++;
@@ -553,10 +505,11 @@
                 if (character.glowingFrameCounter >= character.glowingFrameDelay) {
                     character.glowingFrameCounter = 0;
                     character.glowingFrameIndex++;
-                    
                     if (character.glowingFrameIndex >= character.glowingFrameCount) {
                         character.isGlowing = false;
                         character.glowingFrameIndex = 0;
+                        character.idleFrameIndex = 0;
+                        character.idleFrameCounter = 0;
                     }
                 }
             } else if (character.isJumping) {
@@ -581,15 +534,31 @@
                 }
             }
             
-            // 6. Background Animation Logic
             background.frameCounter++;
             if (background.frameCounter >= background.frameDelay) {
                 background.frameCounter = 0;
                 background.frameIndex = (background.frameIndex + 1) % background.frameCount;
             }
+            
+            treeLayer.frameCounter++;
+            if (treeLayer.frameCounter >= treeLayer.frameDelay) {
+                treeLayer.frameCounter = 0;
+                treeLayer.frameIndex = (treeLayer.frameIndex + 1) % treeLayer.frameCount;
+            }
+            
+            newBackgroundLayer.frameCounter++;
+            if (newBackgroundLayer.frameCounter >= newBackgroundLayer.frameDelay) {
+                newBackgroundLayer.frameCounter = 0;
+                newBackgroundLayer.frameIndex = (newBackgroundLayer.frameIndex + 1) % newBackgroundLayer.frameCount;
+            }
+            
+            newBackground2Layer.frameCounter++;
+            if (newBackground2Layer.frameCounter >= newBackground2Layer.frameDelay) {
+                newBackground2Layer.frameCounter = 0;
+                newBackground2Layer.frameIndex = (newBackground2Layer.frameIndex + 1) % newBackground2Layer.frameCount;
+            }
         }
         
-        // Draw function
         function draw() {
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -598,137 +567,240 @@
             ctx.scale(zoom, zoom);
             ctx.translate(-canvas.width / 2, -canvas.height / 2);
             
-            // === LAYER 1: DRAW BACKGROUND WITH PARALLAX ===
-            let currentBgImage = background.frames[background.frameIndex];
-            
-            if (currentBgImage && currentBgImage.complete && currentBgImage.naturalHeight !== 0) {
-                let bgWidth = canvas.width;
-                let bgHeight = canvas.height;
-                let offsetX = background.x % bgWidth;
-                
-                ctx.drawImage(currentBgImage, offsetX - bgWidth, 0, bgWidth, bgHeight);
-                ctx.drawImage(currentBgImage, offsetX, 0, bgWidth, bgHeight);
-                ctx.drawImage(currentBgImage, offsetX + bgWidth, 0, bgWidth, bgHeight);
-            }
-            
-            // === LAYER 2: DRAW CHARACTER ===
-            let currentImage;
-            let useDirection = true;
-            
-            if (character.isLanding) {
-                currentImage = character.landFrames[character.landFrameIndex];
-            } else if (character.isTurbo) {
-                currentImage = character.turboFrames[character.turboFrameIndex];
-            } else if (character.isBoost) {
-                currentImage = character.boostFrames[character.boostFrameIndex];
-            } else if (character.isFlyingDown) {
-                currentImage = character.flyDownFrames[character.flyDownFrameIndex];
-            } else if (character.isFlyingUp) {
-                currentImage = character.flyUpFrames[character.flyUpFrameIndex];
-            } else if (character.isFloating) {
-                currentImage = character.floatFrames[character.floatFrameIndex];
-            } else if (character.isGlowing) {
-                currentImage = character.glowingFrames[character.glowingFrameIndex];
-            } else if (character.isJumping) {
-                currentImage = character.jumpFrames[character.jumpFrameIndex];
-            } else if (character.isMoving) {
-                currentImage = character.walkFrames[character.walkFrameIndex];
-            } else {
-                currentImage = character.idleFrames[character.idleFrameIndex];
-            }
-            
-            if (currentImage && currentImage.complete && currentImage.naturalHeight !== 0) {
-                if (character.direction === 'right') {
-                    ctx.save();
-                    ctx.translate(character.x + character.width / 2, 0); 
-                    ctx.scale(-1, 1); 
-                    ctx.translate(-(character.x + character.width / 2), 0);
-                    ctx.drawImage(currentImage, character.x, character.y, character.width, character.height);
-                    ctx.restore();
-                } else {
-                    ctx.drawImage(currentImage, character.x, character.y, character.width, character.height);
+            const drawParallax = (layer, offsetName, scale = 1) => {
+                const img = layer.frames[layer.frameIndex];
+                if (img && img.complete && img.naturalHeight !== 0) {
+                    const w = canvas.width * scale, h = canvas.height * scale;
+                    const offsetX = layer.x % w;
+                    const offsetY = layer.y % h;
+                    for (let dy = -2; dy <= 2; dy++) {
+                        for (let dx = -2; dx <= 2; dx++) {
+                            ctx.drawImage(img, offsetX + dx * w, offsetY + dy * h, w, h);
+                        }
+                    }
                 }
+            };
+
+            const drawStaticLeft = (layer, scale = 1) => {
+                const img = layer.frames[layer.frameIndex];
+                if (img && img.complete && img.naturalHeight !== 0) {
+                    const w = canvas.width * scale, h = canvas.height * scale;
+                    ctx.drawImage(img, 0, 0, w, h);
+                }
+            };
+            
+            drawParallax(background, 'x', 1);
+            
+            worldObjects.forEach(obj => {
+                if (obj.x > -300 && obj.x < canvas.width + 300) {
+                    let img;
+                    let scale;
+                    
+                    if (obj.state === 'growing') {
+                        img = plantFrames[obj.frameIndex];
+                        scale = obj.plantScale || 1.0;
+                    } else if (obj.state === 'growing-new-tree') {
+                        img = newTreeFrames[obj.frameIndex];
+                        scale = obj.treeScale || 1.0;
+                    } else if (obj.state === 'grown-new-tree') {
+                        img = newTreeFrames[obj.frameIndex];
+                        scale = obj.treeScale || 1.0;
+                    } else {
+                        img = treeLayer.frames[obj.frameIndex];
+                        scale = obj.treeScale || 1.0;
+                    }
+                    
+                    if (img && img.complete && img.naturalHeight !== 0) {
+                        const scaledWidth = img.width * scale;
+                        const scaledHeight = img.height * scale;
+                        const drawX = obj.x - (scaledWidth / 2);
+                        const drawY = obj.y - scaledHeight;
+                        
+                        if (obj.state === 'grown' || obj.state === 'grown-new-tree') {
+                            const alpha = 0.5 + (obj.depthLayer * 0.25);
+                            ctx.globalAlpha = alpha;
+                    }
+                    
+                    ctx.drawImage(img, drawX, drawY, scaledWidth, scaledHeight);
+                    ctx.globalAlpha = 1.0;
+                } else {
+                    if (obj.state === 'growing' || obj.state === 'growing-new-tree') {
+                        ctx.fillStyle = `rgba(100, 255, 100, ${obj.frameIndex / plantCount})`;
+                        const size = (20 + (obj.frameIndex * 2)) * scale;
+                        ctx.fillRect(obj.x - size/2, obj.y - size, size, size);
+                    } else {
+                        ctx.fillStyle = '#228B22';
+                        ctx.fillRect(obj.x - 30 * scale, obj.y - 80 * scale, 60 * scale, 80 * scale);
+                    }
+                }
+            }
+        });
+         
+        // ==========================================
+        // === TURBO EFFECT & BODY DRAWING =========
+        // ==========================================
+        if (character.isTurbo) {
+            const pivotX = character.x + character.width / 2 + turboCharOffsetX;
+            const pivotY = character.y + character.height / 2 + turboCharOffsetY;
+            
+            // FIX: Use character.direction instead of keys['d']
+            // This ensures the direction stays correct even if you stop pressing D
+            const facingRight = character.direction === 'right';
+            const scaleX = facingRight ? 1 : -1;
+
+            ctx.save();
+            ctx.translate(pivotX, pivotY);
+            ctx.scale(scaleX, 1);
+
+            const tailImg = character.turboBoostFrames[character.turboBoostFrameIndex];
+            if (tailImg && tailImg.complete && tailImg.naturalHeight !== 0) {
+                const tailW = character.width * turboBoostWidthScale;
+                const tailH = character.height * turboBoostHeightScale;
+                
+                ctx.save();
+                ctx.rotate(turboBoostRotationAngle * (Math.PI / 180));
+                ctx.drawImage(tailImg, 
+                    -tailW/2 + turboBoostOffsetX, 
+                    -tailH/2 + turboBoostOffsetY, 
+                    tailW, tailH
+                );
+                ctx.restore();
+            }
+
+            const bodyImg = character.turboFrames[character.turboFrameIndex];
+            if (bodyImg && bodyImg.complete && bodyImg.naturalHeight !== 0) {
+                const bodyW = character.width * turboCharWidthScale;
+                const bodyH = character.height * turboCharHeightScale;
+                ctx.save();
+                ctx.rotate(turboCharRotationAngle * (Math.PI / 180));
+                ctx.drawImage(bodyImg, -bodyW/2, -bodyH/2, bodyW, bodyH);
+                ctx.restore();
             } else {
-                // Fallback Character Box
-                ctx.fillStyle = character.isLanding ? '#9C27B0' : 
-                               (character.isTurbo ? '#00FF00' : 
-                               (character.isBoost ? '#FFFF00' : 
-                               (character.isFlyingDown ? '#FF6F00' : 
-                               (character.isFlyingUp ? '#E91E63' : 
-                               (character.isFloating ? '#00BFFF' : 
-                               (character.isGlowing ? '#FFD700' : 
-                               (character.isJumping ? '#FF5722' : '#4CAF50'))))))); 
+                ctx.fillStyle = '#00FF00';
+                ctx.fillRect(-character.width/2, -character.height/2, character.width, character.height);
+            }
+
+            ctx.restore();
+        }
+        // ==========================================
+        // === END TURBO DRAWING ===================
+        // ==========================================
+
+        let img;
+        if (character.isLanding) img = character.landFrames[character.landFrameIndex];
+        else if (character.isTurbo) { /* Handled above */ }
+        else if (character.isBoost) img = character.boostFrames[character.boostFrameIndex];
+        else if (character.isFlyingDown) img = character.flyDownFrames[character.flyDownFrameIndex];
+        else if (character.isFlyingUp) img = character.flyUpFrames[character.flyUpFrameIndex];
+        else if (character.isFloating) img = character.floatFrames[character.floatFrameIndex];
+        else if (character.isGlowing) img = character.glowingFrames[character.glowingFrameIndex];
+        else if (character.isJumping) img = character.jumpFrames[character.jumpFrameIndex];
+        else if (character.isMoving) img = character.walkFrames[character.walkFrameIndex];
+        else img = character.idleFrames[character.idleFrameIndex];
+        
+        // ==========================================
+        // === STANDARD CHARACTER DRAWING =========
+        // ==========================================
+        if (!character.isTurbo && img) {
+            if (img.complete && img.naturalHeight !== 0) {
+                const w = character.width;
+                const h = character.height;
+                const x = character.x;
+                const y = character.y;
+
+                ctx.save();
+                // Move to center of character
+                ctx.translate(x + w / 2, y + h / 2);
+
+                // LOGIC FIX:
+                // 1. Boost sprites face Right (like Turbo).
+                // 2. Normal sprites (Walk, Idle, Jump, Land, Float, Fly) face Left.
+                
+                if (character.isBoost) {
+                    // Boost sprites face Right. Flip ONLY if moving Left.
+                    if (character.direction === 'left') {
+                        ctx.scale(-1, 1);
+                    }
+                } else {
+                    // Normal sprites face Left. Flip ONLY if moving Right.
+                    if (character.direction === 'right') {
+                        ctx.scale(-1, 1);
+                    }
+                }
+
+                // Draw image centered on origin
+                ctx.drawImage(img, -w / 2, -h / 2, w, h);
+
+                ctx.restore();
+            } else {
+                // Fallback rectangle
+                const colors = ['#4CAF50', '#4CAF50', '#FF5722', '#FFD700', '#00BFFF', '#E91E63', '#FF6F00', '#FFFF00', '#00FF00', '#9C27B0'];
+                const states = [0, character.isMoving, character.isJumping, character.isGlowing, character.isFloating, character.isFlyingUp, character.isFlyingDown, character.isBoost, character.isTurbo, character.isLanding];
+                ctx.fillStyle = colors[states.indexOf(true)];
                 ctx.fillRect(character.x, character.y, character.width, character.height);
                 ctx.fillStyle = '#fff';
-                let eyeOffset = character.direction === 'right' ? 12 : 44;
                 ctx.beginPath();
-                ctx.arc(character.x + eyeOffset, character.y + 20, 8, 0, Math.PI * 2);
+                const eyeX = character.direction === 'left' ? character.x + 38 : character.x + 90;
+                ctx.arc(eyeX, character.y + 20, 8, 0, Math.PI * 2);
                 ctx.fill();
             }
-            
-            ctx.restore();
-            
-            // UI Info
-            ctx.fillStyle = '#888';
-            ctx.font = '16px Arial';
-            ctx.textAlign = 'left';
-            ctx.fillText('A : Move Left', 20, 30);
-            ctx.fillText('D : Move Right', 20, 50);
-            ctx.fillText('SPACE (1x) : Jump', 20, 70);
-            ctx.fillText('SPACE (2x - Mid Air) : Float', 20, 90);
-            ctx.fillText('SPACE (3x - While Floating) : Land', 20, 110);
-            ctx.fillText('SPACE (While Landing) : Float Again', 20, 130);
-            ctx.fillText('G : Glowing', 20, 150);
-            ctx.fillText('W : Fly Up (while floating)', 20, 170);
-            ctx.fillText('S : Fly Down (while floating)', 20, 190);
-            ctx.fillText('SHIFT + A/D : Boost (3x speed)', 20, 210);
-            ctx.fillText('Hold SHIFT 3 sec : Turbo (10x speed)', 20, 230);
-            ctx.fillText('Release SHIFT : Auto Land', 20, 250); // New UI Text
-            ctx.fillText('Scroll / +/- : Zoom (' + zoom.toFixed(1) + 'x)', 20, 270);
-            
-            let stateText = character.isLanding ? "State: Landing" :
-                           (character.isTurbo ? "State: TURBO!" :
-                           (character.isBoost ? "State: BOOST!" :
-                           (character.isFlyingDown ? "State: Flying Down" :
-                           (character.isFlyingUp ? "State: Flying Up" : 
-                           (character.isFloating ? "State: Floating" : 
-                           (character.isGlowing ? "State: Glowing" : 
-                           (character.isJumping ? "State: Jumping" : 
-                           (character.isMoving ? "State: Walking" : "State: Idle"))))))));
-            
-            ctx.fillStyle = character.isLanding ? '#9C27B0' : 
-                           (character.isTurbo ? '#00FF00' : 
-                           (character.isBoost ? '#FFFF00' : 
-                           (character.isFlyingDown ? '#FF6F00' : 
-                           (character.isFlyingUp ? '#E91E63' : 
-                           (character.isFloating ? '#00BFFF' : 
-                           (character.isGlowing ? '#FFD700' : 
-                           (character.isJumping ? '#FF5722' : 
-                           (character.isMoving ? '#4CAF50' : '#FFC107'))))))));
-            ctx.fillText(stateText, 20, 300);
-            
-            // Boost timer display
-            if (character.isBoost) {
-                const elapsedTime = Date.now() - character.boostStartTime;
-                const remainingTime = ((character.boostDuration - elapsedTime) / 1000).toFixed(1);
-                ctx.fillStyle = '#FFFF00';
-                ctx.fillText(`Turbo in: ${remainingTime}s`, 20, 320);
-            }
-            
-            // Frame Debug Info
-            ctx.fillStyle = '#555';
-            ctx.font = '12px Arial';
-            ctx.fillText(`BG Frame: ${background.frameIndex + 1} / ${bgCount}`, 20, 350);
-            ctx.fillText(`Position: X=${Math.round(character.x)}, Y=${Math.round(character.y)}`, 20, 370);
         }
         
-        // Game Loop
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
+        drawParallax(treeLayer, 'x', 1.5);
+        drawStaticLeft(newBackgroundLayer, 1);
+        drawStaticLeft(newBackground2Layer, 1);
+        ctx.restore();
+        
+        if (showUI) {
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'left';
+            const controls = [
+                'A : Move Left', 'D : Move Right', 'SPACE (1x) : Jump',
+                'SPACE (2x - Mid Air) : Float', 'SPACE (3x - While Floating) : Land',
+                'SPACE (While Landing) : Float Again', 'G : Glowing',
+                'W : Fly Up (while floating)', 'S : Fly Down (while floating)',
+                'P : Plant Animated Tree (loops animation)', 
+                'O : Plant New Tree (new_tree folder, loops animation)',
+                'SHIFT + A/D : Boost (3x speed)', 'Hold SHIFT 3 sec : Turbo (10x speed + effect)',
+                'Release SHIFT : Auto Land', 'Scroll / +/- : Zoom (' + zoom.toFixed(1) + 'x)',
+                'H : Hide/Show Controls'
+            ];
+            controls.forEach((text, i) => ctx.fillText(text, 20, 30 + i * 20));
+            
+            const stateNames = ['Idle', 'Walking', 'Jumping', 'Glowing', 'Floating', 'Flying Up', 'Flying Down', 'BOOST!', 'TURBO!', 'Landing'];
+            const stateColors = ['#FFC107', '#4CAF50', '#FF5722', '#FFD700', '#00BFFF', '#E91E63', '#FF6F00', '#FFFF00', '#00FF00', '#9C27B0'];
+            const stateIdx = [0, character.isMoving, character.isJumping, character.isGlowing, character.isFloating, character.isFlyingUp, character.isFlyingDown, character.isBoost, character.isTurbo, character.isLanding].lastIndexOf(true);
+            ctx.fillStyle = stateColors[stateIdx];
+            ctx.fillText('State: ' + stateNames[stateIdx], 20, 330);
+            
+            if (character.isBoost) {
+                const remaining = ((character.boostDuration - (Date.now() - character.boostStartTime)) / 1000).toFixed(1);
+                ctx.fillStyle = '#FFFF00';
+                ctx.fillText(`Turbo in: ${remaining}s`, 20, 350);
+            }
+
+            ctx.fillStyle = '#888';
+            ctx.fillText(`World Objects (Trees): ${worldObjects.length}`, 20, 370);
+            
+            ctx.fillStyle = '#555';
+            ctx.font = '12px Arial';
+            ctx.fillText(`BG: ${background.frameIndex + 1}/${bgCount} | Tree: ${treeLayer.frameIndex + 1}/${treeCount}`, 20, 390);
+            ctx.fillText(`Position: X=${Math.round(character.x)}, Y=${Math.round(character.y)}`, 20, 410);
+        } else {
+            ctx.fillStyle = '#888';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('Press H to show controls', 20, 30);
         }
-        gameLoop();
+    }
+        
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+    gameLoop();
     </script>
 </body>
 </html>
