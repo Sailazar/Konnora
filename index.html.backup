@@ -1,0 +1,2026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Konno - Optimized Space</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #1a1a1a;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            border: 2px solid #333;
+        }
+        canvas {
+            display: block;
+            background: #0a0a0a;
+            cursor: crosshair;
+        }
+        
+        /* === START SCREEN MENU === */
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 10, 10, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+            transition: opacity 0.3s;
+        }
+        .menu-content {
+            background: rgba(30, 30, 30, 0.9);
+            border: 2px solid #FFD700;
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 0 20px #FFD700;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #FFD700;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            font-size: 32px;
+            text-shadow: 0 0 10px #FFD700;
+        }
+        .menu-input {
+            background: #111;
+            border: 1px solid #555;
+            color: #FFF;
+            padding: 10px;
+            font-size: 18px;
+            font-family: 'Courier New', Courier, monospace;
+            width: 80%;
+            margin-bottom: 20px;
+            text-align: center;
+            outline: none;
+        }
+        .menu-input:focus {
+            border-color: #FFD700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+        }
+        .menu-btn {
+            background: #222;
+            border: 1px solid #00FFFF;
+            color: #00FFFF;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-family: 'Courier New', Courier, monospace;
+            cursor: pointer;
+            margin: 10px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            width: 80%;
+            font-weight: bold;
+        }
+        .menu-btn:hover {
+            background: #00FFFF;
+            color: #000;
+            box-shadow: 0 0 15px #00FFFF;
+        }
+        .menu-btn.save {
+            border-color: #FFD700;
+            color: #FFD700;
+        }
+        .menu-btn.save:hover {
+            background: #FFD700;
+            color: #000;
+            box-shadow: 0 0 15px #FFD700;
+        }
+
+        #message-overlay {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 50;
+        }
+        .toast {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #00FFFF;
+            color: #00FFFF;
+            padding: 15px 30px;
+            font-size: 24px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: bold;
+        }
+        .toast.gold { border-color: #FFD700; color: #FFD700; }
+        .toast.ether { border-color: #9D00FF; color: #9D00FF; }
+        .toast.star { border-color: #FFFFFF; color: #FFFFFF; text-shadow: 0 0 10px #FFFFFF; }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="message-overlay"><div class="toast" id="toast-msg">Message</div></div>
+        
+        <!-- START / MENU SCREEN -->
+        <div id="start-screen">
+            <div class="menu-content">
+                <h1>KONNO</h1>
+                <p style="color:#AAA; margin-bottom: 20px;">Astral Energy Collector</p>
+                <p style="color:#FFD700; margin-bottom: 20px; font-size: 14px;">Optimized & Expanded Galaxy</p>
+                
+                <input type="text" id="save-name-input" class="menu-input" placeholder="Enter Save Name..." maxlength="20">
+                
+                <button class="menu-btn save" onclick="saveGame()">SAVE & DOWNLOAD</button>
+                <label for="file-input">
+                    <div class="menu-btn">LOAD FILE</div>
+                </label>
+                <input type="file" id="file-input" accept=".json" style="display: none;" onchange="loadGame(this)">
+                
+                <button class="menu-btn" onclick="startNewGame()">NEW GAME</button>
+                <p style="font-size: 12px; color: #666; margin-top: 20px;">ESC to Toggle Menu</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 1200;
+        canvas.height = 800;
+
+        // ==========================================
+        // === GAME STATE MANAGEMENT ==============
+        // ==========================================
+        let isGameRunning = false; 
+        
+        // ==========================================
+        // === GAMEPLAY CONFIGURATION ===============
+        // ==========================================
+        
+        // --- SPAWNING TIMINGS ---
+        const AUTO_SPAWN_INTERVAL_MS = 6000; 
+        const AUTO_SPAWN_COUNT = 2;
+        const STARTING_ORBS = 0;
+        const ORB_DRIFT_SPEED = 0.5;
+        
+        // --- COST & RARITY ---
+        const ENERGY_COST_TO_PLANT = 10;
+        const ORBS_DROPPED_PER_TREE = 4;
+        const PLANTING_COOLDOWN_MS = 2000;
+
+        // === ETHER CONTROLS ===
+        const ETHER_SPAWN_AMOUNT = 1;       
+        const ETHER_SIZE_BASE = 8;          
+        const ETHER_SIZE_VARIANCE = 2;      
+        const ETHER_SPAWN_RATE_MIN = 3000;  
+        const ETHER_SPAWN_RATE_MAX = 8000;  
+        const MAX_ETHER_PIXELS = 150;  
+
+        // === ENERGY ORBS LIMIT (PERFORMANCE FIX) ===
+        const MAX_ENERGY_ORBS = 200; 
+
+        // === AURELS CONFIGURATION (GOLDEN PARTICLES) ===
+        const AUREL_SPAWN_RATE_MS = 120000; 
+        const AUREL_VALUE = 1;
+
+        // === ATMOSPHERE MECHANIC ===
+        const ATMOSPHERE_THRESHOLD = 10;    
+
+        // === MERGE MECHANICS ===
+        const MERGE_TIME_SEC = 21;           
+        const MERGE_DISTANCE = 60;
+
+        // --- NEW GROUND BUILDING ---
+        const NEW_GROUND_COST_ETHER = 100;
+        const NEW_GROUND_WIDTH = 600; 
+
+        // --- FOREST MECHANICS ---
+        const FOREST_SIZE_THRESHOLD = 10;
+        const FOREST_CLUSTER_RADIUS = 450;
+        const FOREST_SPAWN_INTERVAL_MS = 2000;
+        const FOREST_SPAWN_AMOUNT = 2;
+
+        // === EXPLORATION STARS MECHANIC ===
+        const STAR_COUNT = 9; 
+        const STAR_SPACING = 1800; // Increased to spread them out
+        const STAR_CENTER_Y = 0; // Higher in the sky
+        const STAR_VISIBILITY_RANGE = 3000; // Increased for wider view
+        const STAR_INTERACTION_RADIUS = 80;
+        
+        let lastAutoSpawnTime = Date.now();
+        let lastAurelSpawnTime = Date.now(); 
+        let lastForestSpawnTime = Date.now();
+        
+        let activeForestCenters = []; 
+        let stars = []; 
+
+        // ==========================================
+        // === CAMERA VARIABLES =====================
+        // ==========================================
+        let zoom = 1;
+        const minZoom = 0.2;
+        const maxZoom = 4.0;
+        const zoomStep = 0.1;
+        
+        let cameraOffsetX = 0;
+        let cameraOffsetY = 0;
+
+        // ==========================================
+        // === MOUSE CAMERA TRACKING =============
+        // ==========================================
+        let mouseX = 0;
+        let mouseY = 0;
+        let targetCameraOffsetX = 0; 
+        let targetCameraOffsetY = 0;
+
+        canvas.addEventListener('mousemove', (e) => {
+            mouseX = e.offsetX - (canvas.width / 2);
+            mouseY = e.offsetY - (canvas.height / 2);
+            targetCameraOffsetX = -mouseX * zoom;
+            targetCameraOffsetY = -mouseY * zoom;
+        });
+
+
+        // ==========================================
+        // === TURBO BOOST CONTROLS =================
+        // ==========================================
+        const turboBoostWidthScale = 4.6;
+        const turboBoostHeightScale = 0.55;
+        const turboBoostOffsetX = -303; 
+        const turboBoostOffsetY = 13;  
+        const turboBoostRotationAngle = -8; 
+
+        const turboCharWidthScale = 1.0;
+        const turboCharHeightScale = 1.0;
+        const turboCharOffsetX = 0;      
+        const turboCharOffsetY = -15;      
+        const turboCharRotationAngle = 24; 
+        
+        let showUI = true;
+        let collectedEnergy = 0;
+        let collectedEther = 0;
+        let collectedAurels = 0; 
+        
+        let lastPlantTime = 0;
+        
+        let floatingTexts = [];
+        let energyOrbs = []; 
+        let etherPixels = []; 
+        let grounds = []; 
+        let atmosphereParticles = []; 
+        let geometricCores = [];
+
+        const plantCount = 214; 
+        const treeCount = 122;
+        const newTreeCount = 122;
+        const turboBoostCount = 80;
+        const particleCount = 1022; 
+
+        const character = {
+            x: 400, y: 600, groundY: 600,
+            width: 128, height: 128,
+            speed: 6, floatSpeed: 10,
+            boostMultiplier: 1, turboMultiplier: 7,
+            direction: 'right', isMoving: false,
+            isJumping: false, velocityY: 0, jumpPower: 10, gravity: 0.3,
+            isGlowing: false, isFloating: false, isFlyingUp: false, isFlyingDown: false, isLanding: false,
+            isBoost: false, isTurbo: false, boostStartTime: 0, boostDuration: 1500,
+            flyUpSpeed: 4, flyDownSpeed: 4,
+            flyUpSpeedBoost: 10, flyDownSpeedBoost: 11,
+            flyUpSpeedTurbo: 19, flyDownSpeedTurbo: 19,
+            walkFrameIndex: 0, walkFrameDelay: 3, walkFrameCounter: 0,
+            idleFrameIndex: 0, idleFrameDelay: 3, idleFrameCounter: 0,
+            jumpFrameIndex: 0, jumpFrameDelay: 3, jumpFrameCounter: 0,
+            glowingFrameIndex: 0, glowingFrameDelay: 2, glowingFrameCounter: 0,
+            floatFrameIndex: 0, floatFrameDelay: 0.7, floatFrameCounter: 0,
+            flyUpFrameIndex: 0, flyUpFrameDelay: 0.5, flyUpFrameCounter: 0,
+            flyDownFrameIndex: 0, flyDownFrameDelay: 0.5, flyDownFrameCounter: 0,
+            landFrameIndex: 0, landFrameDelay: 0.5, landFrameCounter: 0,
+            boostFrameIndex: 0, boostFrameDelay: 1, boostFrameCounter: 0,
+            turboFrameIndex: 0, turboFrameDelay: 3, turboFrameCounter: 0,
+            turboBoostFrameIndex: 0, turboBoostFrameDelay: 1, turboBoostCounter: 0,
+            walkFrames: [], idleFrames: [], jumpFrames: [], glowingFrames: [],
+            floatFrames: [], flyUpFrames: [], flyDownFrames: [], landFrames: [],
+            boostFrames: [], turboFrames: [], turboBoostFrames: []
+        };
+
+        let worldObjects = [];
+        const plantFrames = [];
+        const newTreeFrames = [];
+
+        const particleLayer = {
+            frames: [],
+            frameIndex: 0,
+            frameDelay: 3,
+            frameCounter: 0,
+            parallaxFactor: 0.01,
+            scale: 4.0
+        };
+
+        const background = {
+            frames: [], frameIndex: 0, frameDelay: 3, frameCounter: 0,
+            x: 0, y: 0, parallaxSpeed: 15, verticalParallaxSpeed: 8
+        };
+        
+        const treeLayer = {
+            frames: [], frameIndex: 0, frameDelay: 3, frameCounter: 0,
+            x: 0, y: 0, parallaxSpeed: 25, verticalParallaxSpeed: 12
+        };
+        
+        const newBackgroundLayer = {
+            frames: [], frameIndex: 0, frameDelay: 3, frameCounter: 0,
+            x: 0, y: 0, parallaxSpeed: 35, verticalParallaxSpeed: 16
+        };
+        
+        const newBackground2Layer = {
+            frames: [], frameIndex: 0, frameDelay: 3, frameCounter: 0,
+            x: 0, y: 0, parallaxSpeed: 35, verticalParallaxSpeed: 16
+        };
+        
+        function generateImageArray(prefix, count, folder) {
+            let arr = [];
+            for (let i = 1; i <= count; i++) {
+                arr.push(`${folder}${prefix}_${i.toString().padStart(3, '0')}.png`);
+            }
+            return arr;
+        }
+        
+        const walkCount = 126, idleCount = 126, jumpCount = 50, glowingCount = 50;
+        const floatCount = 42, flyUpCount = 30, flyDownCount = 30, landCount = 110;
+        const boostCount = 96, turboCount = 77, bgCount = 122, newBackgroundCount = 122;
+        
+        const srcs = {
+            walk: generateImageArray('walk_right', walkCount, 'walk/'),
+            idle: generateImageArray('Idle', idleCount, 'idle/'),
+            jump: generateImageArray('jmp', jumpCount, 'jump/'),
+            glowing: generateImageArray('glowing', glowingCount, 'glowing/'),
+            float: generateImageArray('float', floatCount, 'float/'),
+            flyUp: generateImageArray('higher', flyUpCount, 'higher/'),
+            flyDown: generateImageArray('fly_down', flyDownCount, 'fly_down/'),
+            land: generateImageArray('land', landCount, 'land/'),
+            boost: generateImageArray('boost_speed', boostCount, 'boost_speed/'),
+            turbo: generateImageArray('turbo', turboCount, 'turbo/'),
+            turboBoost: generateImageArray('turbo_boost', turboBoostCount, 'turbo_boost/'),
+            bg: generateImageArray('bg', bgCount, 'background/'),
+            tree: generateImageArray('tree', treeCount, 'tree/'),
+            newBackground: generateImageArray('newBackground', newBackgroundCount, 'newBackground/'),
+            plant: generateImageArray('plant', plantCount, 'plant/'),
+            newTree: generateImageArray('new_tree', newTreeCount, 'new_tree/'),
+            particle: generateImageArray('particle', particleCount, 'particles/')
+        };
+        
+        function loadImages() {
+            const loadSet = (srcArray, targetArray) => {
+                srcArray.forEach(src => {
+                    const img = new Image();
+                    img.src = src;
+                    targetArray.push(img);
+                });
+            };
+            
+            loadSet(srcs.walk, character.walkFrames);
+            loadSet(srcs.idle, character.idleFrames);
+            loadSet(srcs.jump, character.jumpFrames);
+            loadSet(srcs.glowing, character.glowingFrames);
+            loadSet(srcs.float, character.floatFrames);
+            loadSet(srcs.flyUp, character.flyUpFrames);
+            loadSet(srcs.flyDown, character.flyDownFrames);
+            loadSet(srcs.land, character.landFrames);
+            loadSet(srcs.boost, character.boostFrames);
+            loadSet(srcs.turbo, character.turboFrames);
+            loadSet(srcs.turboBoost, character.turboBoostFrames);
+            loadSet(srcs.bg, background.frames);
+            loadSet(srcs.tree, treeLayer.frames);
+            loadSet(srcs.newBackground, newBackgroundLayer.frames);
+            loadSet(srcs.newBackground, newBackground2Layer.frames);
+            loadSet(srcs.plant, plantFrames);
+            loadSet(srcs.newTree, newTreeFrames);
+            loadSet(srcs.particle, particleLayer.frames);
+            
+            character.walkFrameCount = walkCount;
+            character.idleFrameCount = idleCount;
+            character.jumpFrameCount = jumpCount;
+            character.glowingFrameCount = glowingCount;
+            character.floatFrameCount = floatCount;
+            character.flyUpFrameCount = flyUpCount;
+            character.flyDownFrameCount = flyDownCount;
+            character.landFrameCount = landCount;
+            character.boostFrameCount = boostCount;
+            character.turboFrameCount = turboCount;
+            character.turboBoostFrameCount = turboBoostCount;
+            background.frameCount = bgCount;
+            treeLayer.frameCount = treeCount;
+            newBackgroundLayer.frameCount = newBackgroundCount;
+            newBackground2Layer.frameCount = newBackgroundCount;
+        }
+        loadImages();
+        
+        // ==========================================
+        // === SAVE / LOAD LOGIC ==============
+        // ==========================================
+
+        function initStars() {
+            stars = [];
+            const centerX = 400;
+            const centerY = STAR_CENTER_Y; // High in sky
+            
+            const goldenAngle = Math.PI * (3 - Math.sqrt(5)); 
+            
+            for (let i = 0; i < STAR_COUNT; i++) {
+                // r = spacing * sqrt(n)
+                const r = STAR_SPACING * Math.sqrt(i + 1);
+                const theta = i * goldenAngle;
+                
+                const x = centerX + r * Math.cos(theta);
+                const y = centerY + r * Math.sin(theta);
+                
+                stars.push({
+                    id: i,
+                    x: x,
+                    y: y,
+                    found: false,
+                    pulseOffset: Math.random() * Math.PI * 2,
+                    sizeVariation: 0.8 + Math.random() * 0.5, 
+                    colorVar: '#FFD700' 
+                });
+            }
+        }
+
+        function startNewGame() {
+            console.log("Starting New Game...");
+            character.x = 400; character.y = 600; character.groundY = 600;
+            character.velocityY = 0;
+            character.isJumping = false; character.isFloating = false;
+            character.isLanding = false; character.isFlyingUp = false; character.isFlyingDown = false;
+            character.isBoost = false; character.isTurbo = false; character.direction = 'right';
+            
+            mouseX = 0; mouseY = 0;
+            cameraOffsetX = 0; cameraOffsetY = 0;
+            targetCameraOffsetX = 0; targetCameraOffsetY = 0;
+            
+            collectedEnergy = 0;
+            collectedEther = 0;
+            collectedAurels = 0;
+            
+            worldObjects = [];
+            energyOrbs = [];
+            etherPixels = [];
+            geometricCores = [];
+            
+            if (grounds.length > 1) grounds = [{ y: 600, type: 'default' }];
+            
+            activeForestCenters = [];
+            
+            initStars();
+            
+            lastAutoSpawnTime = Date.now();
+            lastAurelSpawnTime = Date.now();
+            lastForestSpawnTime = Date.now();
+
+            toggleMenu(false);
+        }
+
+        function saveGame() {
+            const nameInput = document.getElementById('save-name-input');
+            let fileName = "Konno_Save";
+            if (nameInput && nameInput.value.trim() !== "") {
+                fileName = nameInput.value.trim().replace(/[^a-z0-9_\-]/gi, '_');
+            }
+            
+            const saveData = {
+                character: {
+                    x: character.x,
+                    y: character.y,
+                    groundY: character.groundY,
+                    direction: character.direction,
+                    velocityY: character.velocityY,
+                    isMoving: character.isMoving,
+                    isJumping: character.isJumping,
+                    isFloating: character.isFloating,
+                    isFlyingUp: character.isFlyingUp,
+                    isFlyingDown: character.isFlyingDown,
+                    isLanding: character.isLanding,
+                    isBoost: character.isBoost,
+                    isTurbo: character.isTurbo
+                },
+                currencies: {
+                    energy: collectedEnergy,
+                    ether: collectedEther,
+                    aurels: collectedAurels
+                },
+                world: {
+                    objects: worldObjects,
+                    energyOrbs: energyOrbs,
+                    etherPixels: etherPixels,
+                    grounds: grounds,
+                    cores: geometricCores,
+                    stars: stars 
+                },
+                systems: {
+                    activeForests: activeForestCenters,
+                    lastAutoSpawn: lastAutoSpawnTime,
+                    lastAurelSpawn: lastAurelSpawnTime,
+                    lastForestSpawn: lastForestSpawnTime
+                }
+            };
+
+            const dataStr = JSON.stringify(saveData);
+            const blob = new Blob([dataStr], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${fileName}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            addFloatingText("GAME SAVED!", character.x, character.y - 50, '#FFD700');
+        }
+
+        function loadGame(inputElement) {
+            const file = inputElement.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (data.character) {
+                        character.x = data.character.x;
+                        character.y = data.character.y;
+                        character.groundY = data.character.groundY;
+                        character.direction = data.character.direction;
+                        character.velocityY = data.character.velocityY;
+                        character.isMoving = data.character.isMoving;
+                        character.isJumping = data.character.isJumping;
+                        character.isFloating = data.character.isFloating;
+                        character.isFlyingUp = data.character.isFlyingUp;
+                        character.isFlyingDown = data.character.isFlyingDown;
+                        character.isLanding = data.character.isLanding;
+                        character.isBoost = data.character.isBoost;
+                        character.isTurbo = data.character.isTurbo;
+                    }
+
+                    if (data.currencies) {
+                        collectedEnergy = data.currencies.energy;
+                        collectedEther = data.currencies.ether;
+                        collectedAurels = data.currencies.aurels;
+                    }
+
+                    if (data.world) {
+                        worldObjects = data.world.objects || [];
+                        energyOrbs = data.world.energyOrbs || [];
+                        etherPixels = data.world.etherPixels || [];
+                        grounds = data.world.grounds || [];
+                        geometricCores = data.world.cores || [];
+                        stars = data.world.stars || [];
+                        
+                        if(energyOrbs.length > MAX_ENERGY_ORBS) energyOrbs.splice(0, energyOrbs.length - MAX_ENERGY_ORBS);
+                        if(etherPixels.length > MAX_ETHER_PIXELS) etherPixels.splice(0, etherPixels.length - MAX_ETHER_PIXELS);
+                    }
+
+                    if (data.systems) {
+                        activeForestCenters = data.systems.activeForests || [];
+                        lastAutoSpawnTime = data.systems.lastAutoSpawn || Date.now();
+                        lastAurelSpawnTime = data.systems.lastAurelSpawn || Date.now();
+                        lastForestSpawnTime = data.systems.lastForestSpawn || Date.now();
+                    }
+
+                    toggleMenu(false);
+                    addFloatingText("GAME LOADED!", character.x, character.y - 50, '#00FFFF');
+                } catch (err) {
+                    console.error("Save load error:", err);
+                    alert("Error loading save file: " + err);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function toggleMenu(show) {
+            const menu = document.getElementById('start-screen');
+            isGameRunning = !show;
+            menu.style.display = show ? 'flex' : 'none';
+            console.log("Menu toggled. Game Running:", isGameRunning);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                toggleMenu(!isGameRunning);
+            }
+        });
+
+        grounds.push({ y: 600, type: 'default' });
+
+        function spawnOrbs(x, y, count, isAurel = false) {
+            const spawnCount = count || ORBS_DROPPED_PER_TREE;
+            for(let i=0; i<spawnCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 50 + Math.random() * 300; 
+                const spawnX = x + Math.cos(angle) * radius;
+                const spawnY = y + Math.sin(angle) * radius;
+                
+                const orbColor = isAurel ? '#FFD700' : (Math.random() > 0.9 ? '#FFD700' : '#00FFFF');
+                const orbSize = isAurel ? 8 : (4 + Math.random() * 4);
+                const orbValue = isAurel ? AUREL_VALUE :1;
+                
+                energyOrbs.push({
+                    id: Date.now() + Math.random(), 
+                    x: spawnX,
+                    y: spawnY,
+                    baseY: spawnY,
+                    vx: (Math.random() - 0.5) * ORB_DRIFT_SPEED,
+                    floatSpeed: 0.02 + Math.random() * 0.04,
+                    angleOffset: Math.random() * Math.PI * 2,
+                    color: orbColor, 
+                    size: orbSize,
+                    pixelJitter: 2,
+                    value: orbValue, 
+                    mergeTarget: null,
+                    mergeStartTime: 0,
+                    isAurel: isAurel
+                });
+            }
+        }
+
+        function spawnEther(x, y, count) {
+            if (etherPixels.length >= MAX_ETHER_PIXELS) return;
+            const spawnCount = count || ETHER_SPAWN_AMOUNT; 
+            for(let i=0; i<spawnCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 30 + Math.random() * 100; 
+                const spawnX = x + Math.cos(angle) * radius;
+                const spawnY = y + Math.sin(angle) * radius;
+                
+                etherPixels.push({
+                    id: Date.now() + Math.random() + 10000, 
+                    x: spawnX,
+                    y: spawnY,
+                    baseY: spawnY,
+                    vx: (Math.random() - 0.5) * 0.2,
+                    floatSpeed: 0.01 + Math.random() * 0.02,
+                    angleOffset: Math.random() * Math.PI * 2,
+                    color: '#9D00FF', 
+                    size: ETHER_SIZE_BASE + Math.random() * ETHER_SIZE_VARIANCE, 
+                    pixelJitter: 1.5,
+                    value: 1,
+                    mergeTarget: null,
+                    mergeStartTime: 0
+                });
+            }
+        }
+
+        function showToast(msg, type = '') {
+            const el = document.getElementById('toast-msg');
+            const overlay = document.getElementById('message-overlay');
+            el.innerText = msg;
+            el.className = 'toast ' + type;
+            overlay.style.opacity = 1;
+            
+            if (overlay.hideTimeout) clearTimeout(overlay.hideTimeout);
+            
+            overlay.hideTimeout = setTimeout(() => {
+                overlay.style.opacity = 0;
+            }, 3000);
+        }
+
+        function addFloatingText(text, x, y, color) {
+            floatingTexts.push({
+                text: text,
+                x: x,
+                y: y,
+                life: 60,
+                color: color
+            });
+        }
+        
+        const keys = {};
+        
+        window.addEventListener('keydown', (e) => {
+            if (!isGameRunning) return;
+
+            if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
+                e.preventDefault();
+            }
+            
+            keys[e.key.toLowerCase()] = true;
+            
+            const handlePlanting = (treeType) => {
+                const now = Date.now();
+                if (now - lastPlantTime < PLANTING_COOLDOWN_MS) {
+                    const cooldownLeft = ((PLANTING_COOLDOWN_MS - (now - lastPlantTime)) / 1000).toFixed(1);
+                    addFloatingText(`Wait ${cooldownLeft}s`, character.x, character.y - 50, '#FF8888');
+                    return;
+                }
+                if (collectedEnergy >= ENERGY_COST_TO_PLANT) {
+                    collectedEnergy -= ENERGY_COST_TO_PLANT;
+                    addFloatingText(`-${ENERGY_COST_TO_PLANT} Energy`, character.x, character.y - 50, '#FF4444');
+                    lastPlantTime = now;
+                    
+                    const depthLayer = Math.floor(Math.random() * 3);
+                    const scales = [0.4, 0.7, 1.0, 1.3, 1.6];
+                    const treeScale = scales[Math.floor(Math.random() * scales.length)];
+                    const yOffsets = [-150, -50, 0];
+                    const yOffset = yOffsets[depthLayer];
+                    const xVariance = (Math.random() - 0.5) * 100;
+                    const spawnX = character.x + character.width / 2 + xVariance;
+                    const spawnY = character.groundY + yOffset;
+                    
+                    const isAnimatedTree = (treeType === 'P');
+                    
+                    const newTreeObj = {
+                        x: spawnX,
+                        y: spawnY,
+                        state: isAnimatedTree ? 'growing' : 'growing-new-tree',
+                        type: isAnimatedTree ? 'animated-tree' : 'new-tree',
+                        frameIndex: 0,
+                        frameCounter: 0,
+                        frameDelay: 7,
+                        plantScale: 1.0,
+                        treeScale: treeScale,
+                        depthLayer: depthLayer,
+                        parallaxMultiplier: 1 - (depthLayer * 0.3),
+                        etherTimer: Date.now() + 2000 
+                    };
+                    
+                    worldObjects.push(newTreeObj);
+                    spawnOrbs(spawnX, spawnY);
+                } else {
+                    addFloatingText("Need Energy!", character.x, character.y - 50, '#FF0000');
+                }
+            };
+
+            if (e.key.toLowerCase() === 'p') handlePlanting('P');
+            if (e.key.toLowerCase() === 'o') handlePlanting('O');
+
+            if (e.key.toLowerCase() === 'b') {
+                const now = Date.now();
+                if (now - lastPlantTime < 1000) {
+                    addFloatingText("Wait 1s", character.x, character.y - 50, '#FF8888');
+                    return;
+                }
+                if (collectedEther >= NEW_GROUND_COST_ETHER) {
+                    collectedEther -= NEW_GROUND_COST_ETHER;
+                    addFloatingText(`-${NEW_GROUND_COST_ETHER} Ether`, character.x, character.y - 50, '#9D00FF');
+                    lastPlantTime = now;
+                    
+                    const spawnY = character.y + character.height; 
+                    const spawnX = character.x + (character.width / 2) - (NEW_GROUND_WIDTH / 2);
+                    
+                    grounds.push({ 
+                        x: spawnX, 
+                        y: spawnY, 
+                        width: NEW_GROUND_WIDTH, 
+                        type: 'particle', 
+                        created: now 
+                    });
+                } else {
+                    addFloatingText(`Need ${NEW_GROUND_COST_ETHER} Ether!`, character.x, character.y - 50, '#FF00FF');
+                }
+            }
+
+            if (e.key === ' ' && !character.isGlowing) {
+                if (character.isLanding) {
+                    character.isLanding = false;
+                    character.velocityY = 0;
+                    character.isFloating = true;
+                    character.floatFrameIndex = 0;
+                } else if (!character.isJumping && !character.isFloating && !character.isFlyingUp && !character.isFlyingDown) {
+                    character.isJumping = true;
+                    character.velocityY = -character.jumpPower;
+                    character.jumpFrameIndex = 0;
+                } else if (character.isJumping) {
+                    character.isJumping = false;
+                    character.velocityY = 0;
+                    character.isFloating = true;
+                    character.floatFrameIndex = 0;
+                } else if (character.isFloating || character.isFlyingUp || character.isFlyingDown || character.isBoost || character.isTurbo) {
+                    const charFeetX = character.x + character.width / 2;
+                    const charFeetY = character.y + character.height;
+                    
+                    let bestGroundY = 99999;
+                    let foundTarget = false;
+
+                    grounds.forEach(g => {
+                        const left = (g.x !== undefined) ? g.x : -Infinity;
+                        const right = (g.width !== undefined) ? g.x + g.width : Infinity;
+                        
+                        if (g.y >= charFeetY - 10 && charFeetX >= left && charFeetX <= right) {
+                            if (!foundTarget || g.y < bestGroundY) {
+                                bestGroundY = g.y;
+                                foundTarget = true;
+                            }
+                        }
+                    });
+
+                    if (foundTarget) {
+                        character.groundY = bestGroundY;
+                    }
+
+                    character.isFloating = false;
+                    character.isFlyingUp = false;
+                    character.isFlyingDown = false;
+                    character.isLanding = true;
+                    character.landFrameIndex = 0;
+                }
+            }
+            
+            if (e.key.toLowerCase() === 'g' && !character.isGlowing && !character.isJumping && !character.isFloating && !character.isLanding) {
+                character.isGlowing = true;
+                character.glowingFrameIndex = 0;
+            }
+            
+            if (e.key.toLowerCase() === 'w') {
+                if (!character.isFlyingUp && !character.isFlyingDown && !character.isLanding) {
+                    if (character.isFloating) {
+                        character.isFloating = false;
+                        character.isFlyingUp = true;
+                        character.flyUpFrameIndex = 0;
+                    } else if (!character.isJumping && !character.isBoost && !character.isTurbo) {
+                        character.isFloating = true;
+                        character.isFlyingUp = true;
+                        character.floatFrameIndex = 0;
+                    }
+                }
+            }
+            
+            if (e.key.toLowerCase() === 's') {
+                if (!character.isFlyingUp && !character.isFlyingDown && !character.isLanding) {
+                    if (character.isFloating) {
+                        character.isFloating = false;
+                        character.isFlyingDown = true;
+                        character.flyDownFrameIndex = 0;
+                    } else if (!character.isJumping && !character.isBoost && !character.isTurbo) {
+                        character.isFloating = true;
+                        character.isFlyingDown = true;
+                        character.floatFrameIndex = 0;
+                    }
+                }
+            }
+            
+            if (e.key === 'Shift' && (character.isFloating || character.isFlyingUp || character.isFlyingDown) && !character.isBoost && !character.isTurbo && (keys['a'] || keys['d'] || keys['w'] || keys['s'])) {
+                character.isBoost = true;
+                character.boostStartTime = Date.now();
+                character.boostFrameIndex = 0;
+            }
+            
+            if (e.key === '+' || e.key === '=') {
+                zoom = Math.min(zoom + zoomStep, maxZoom);
+            }
+            if (e.key === '-' || e.key === '_') {
+                zoom = Math.max(zoom - zoomStep, minZoom);
+            }
+            if (e.key === '0') {
+                zoom = 1;
+            }
+            if (e.key.toLowerCase() === 'h') showUI = !showUI;
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            if (!isGameRunning) return;
+
+            keys[e.key.toLowerCase()] = false;
+            
+            if (e.key === 'Shift' && (character.isBoost || character.isTurbo)) {
+                character.isBoost = false;
+                character.isTurbo = false;
+                character.isFloating = false;
+                character.isFlyingUp = false;
+                character.isFlyingDown = false;
+                character.isLanding = true;
+                character.landFrameIndex = 0;
+                character.boostStartTime = 0;
+            }
+            
+            if (e.key.toLowerCase() === 'w' && character.isFlyingUp) {
+                character.isFlyingUp = false;
+                character.isFloating = true;
+                character.floatFrameIndex = 0;
+            }
+            
+            if (e.key.toLowerCase() === 's' && character.isFlyingDown) {
+                character.isFlyingDown = false;
+                character.isFloating = true;
+                character.floatFrameIndex = 0;
+            }
+        });
+        
+        canvas.addEventListener('wheel', (e) => {
+            if (!isGameRunning) return;
+            e.preventDefault();
+            const oldZoom = zoom;
+            if (e.deltaY < 0) zoom = Math.min(zoom + zoomStep, maxZoom);
+            else zoom = Math.max(zoom - zoomStep, minZoom);
+        });
+
+        function detectForest() {
+            const trees = worldObjects.filter(obj => obj.state === 'grown' || obj.state === 'grown-new-tree');
+            activeForestCenters = []; 
+            
+            if (trees.length < FOREST_SIZE_THRESHOLD) {
+                return;
+            }
+
+            const assignedTreeIndices = new Set();
+            trees.sort((a, b) => a.x - b.x);
+
+            for (let i = 0; i < trees.length; i++) {
+                let t = trees[i];
+                if (assignedTreeIndices.has(i)) continue;
+
+                let currentCluster = [t];
+                assignedTreeIndices.add(i);
+
+                for (let j = i + 1; j < trees.length; j++) {
+                    let other = trees[j];
+                    if (assignedTreeIndices.has(j)) continue;
+                    if (other.x - t.x > FOREST_CLUSTER_RADIUS) break;
+
+                    let inCluster = false;
+                    for(let k=0; k<currentCluster.length; k++){
+                        if (Math.hypot(other.x - currentCluster[k].x, other.y - currentCluster[k].y) < FOREST_CLUSTER_RADIUS) {
+                            inCluster = true;
+                            break;
+                        }
+                    }
+
+                    if (inCluster) {
+                        currentCluster.push(other);
+                        assignedTreeIndices.add(j);
+                    }
+                }
+
+                if (currentCluster.length >= FOREST_SIZE_THRESHOLD) {
+                    let sumX = 0, sumY = 0;
+                    currentCluster.forEach(t => { sumX += t.x; sumY += t.y; });
+                    activeForestCenters.push({
+                        x: sumX / currentCluster.length,
+                        y: sumY / currentCluster.length
+                    });
+                }
+            }
+        }
+        
+        function update() {
+            if (!isGameRunning) return;
+
+            cameraOffsetX += (targetCameraOffsetX - cameraOffsetX) * 0.1;
+            cameraOffsetY += (targetCameraOffsetY - cameraOffsetY) * 0.1;
+
+            // === CULLING OPTIMIZATION ===
+            const viewPaddingUpdate = 1500; // Wide padding to keep sim running off-screen
+            const viewPaddingDraw = 500; // Tighter padding for drawing
+            const viewLeft = character.x - (canvas.width / zoom) - viewPaddingUpdate;
+            const viewRight = character.x + (canvas.width / zoom) + viewPaddingUpdate;
+            const viewTop = character.y - (canvas.height / zoom) - viewPaddingUpdate;
+            const viewBottom = character.y + (canvas.height / zoom) + viewPaddingUpdate;
+            // ===========================
+
+            if (energyOrbs.length > MAX_ENERGY_ORBS) {
+                energyOrbs.splice(0, energyOrbs.length - MAX_ENERGY_ORBS);
+            }
+            if (etherPixels.length > MAX_ETHER_PIXELS) {
+                etherPixels.splice(0, etherPixels.length - MAX_ETHER_PIXELS);
+            }
+
+            detectForest();
+            const now = Date.now();
+
+            if (now - lastAutoSpawnTime > AUTO_SPAWN_INTERVAL_MS) {
+                spawnOrbs(character.x, character.y, AUTO_SPAWN_COUNT, false);
+                lastAutoSpawnTime = now;
+            }
+
+            // === FOREST AUREL SPAWN LOGIC ===
+            if (activeForestCenters.length > 0) {
+                if (now - lastAurelSpawnTime > AUREL_SPAWN_RATE_MS) {
+                    const randomForest = activeForestCenters[Math.floor(Math.random() * activeForestCenters.length)];
+                    const spawnX = randomForest.x + (Math.random() - 0.5) * 300;
+                    const spawnY = randomForest.y - 200 + (Math.random() * 100);
+                    spawnOrbs(spawnX, spawnY, 1, true); 
+                    lastAurelSpawnTime = now;
+                    addFloatingText("FOREST AUREL!", spawnX, spawnY - 50, '#FFD700');
+                }
+            }
+            // ===============================
+
+            if (activeForestCenters.length > 0) {
+                if (now - lastForestSpawnTime > FOREST_SPAWN_INTERVAL_MS) {
+                    activeForestCenters.forEach(center => {
+                        // Cull spawn if offscreen
+                        if(center.x > viewLeft && center.x < viewRight) {
+                            spawnOrbs(center.x, center.y, FOREST_SPAWN_AMOUNT, false);
+                        }
+                    });
+                    lastForestSpawnTime = now;
+                }
+            }
+
+            if (character.isBoost && !character.isTurbo && keys['shift'] && (keys['a'] || keys['d'] || keys['w'] || keys['s'])) {
+                const elapsed = Date.now() - character.boostStartTime;
+                if (elapsed >= character.boostDuration) {
+                    character.isBoost = false;
+                    character.isTurbo = true;
+                    character.turboFrameIndex = 0;
+                    character.turboBoostFrameIndex = 0;
+                }
+            }
+            
+            let baseSpeed = (character.isFloating || character.isFlyingUp || character.isFlyingDown) ? character.floatSpeed : character.speed;
+            const currentSpeed = character.isTurbo ? baseSpeed * character.turboMultiplier : (character.isBoost ? baseSpeed * character.boostMultiplier : baseSpeed);
+            
+            let flyUpSpeed = character.flyUpSpeed, flyDownSpeed = character.flyDownSpeed;
+            if (character.isTurbo) {
+                flyUpSpeed = character.flyUpSpeedTurbo;
+                flyDownSpeed = character.flyDownSpeedTurbo;
+            } else if (character.isBoost) {
+                flyUpSpeed = character.flyUpSpeedBoost;
+                flyDownSpeed = character.flyDownSpeedBoost;
+            }
+            
+            worldObjects.sort((a, b) => a.depthLayer - b.depthLayer);
+            
+            for (let i = 0; i < worldObjects.length; i++) {
+                let obj = worldObjects[i];
+                obj.frameCounter++;
+                if (obj.frameCounter >= obj.frameDelay) {
+                    obj.frameCounter = 0;
+                    if (obj.state === 'growing') {
+                        obj.frameIndex++;
+                        if (obj.frameIndex >= plantCount) {
+                            obj.state = 'grown'; obj.frameIndex = 0; obj.frameDelay = 3;
+                        }
+                    } else if (obj.state === 'growing-new-tree') {
+                        obj.frameIndex++;
+                        if (obj.frameIndex >= newTreeCount) {
+                            obj.state = 'grown-new-tree'; obj.frameIndex = 0; obj.frameDelay = 3;
+                        }
+                    } else if (obj.state === 'grown') {
+                        obj.frameIndex = (obj.frameIndex + 1) % treeCount;
+                    } else if (obj.state === 'grown-new-tree') {
+                        obj.frameIndex = (obj.frameIndex + 1) % newTreeCount;
+                    }
+                }
+                if (obj.state === 'grown' || obj.state === 'grown-new-tree') {
+                    if (!obj.etherTimer) obj.etherTimer = now + 2000;
+                    if (now > obj.etherTimer) {
+                        const treeHeight = 200 * (obj.treeScale || 1);
+                        spawnEther(obj.x, obj.y - treeHeight + 50); 
+                        const nextSpawn = ETHER_SPAWN_RATE_MIN + Math.random() * (ETHER_SPAWN_RATE_MAX - ETHER_SPAWN_RATE_MIN);
+                        obj.etherTimer = now + nextSpawn;
+                    }
+                }
+            }
+
+            let ignoreCollision = character.isFlyingDown || character.isBoost || character.isTurbo;
+            if (!ignoreCollision) {
+                let closestGroundY = -99999;
+                let foundGround = false;
+                const charFeetY = character.y + character.height;
+                const charCenterX = character.x + character.width / 2;
+
+                grounds.forEach(g => {
+                    let inHorizontalRange = true;
+                    if (g.width) {
+                        inHorizontalRange = (charCenterX >= g.x && charCenterX <= g.x + g.width);
+                    }
+                    
+                    if (inHorizontalRange && charFeetY >= g.y && charFeetY - character.velocityY <= g.y + 10) {
+                        if (g.y > closestGroundY) {
+                            closestGroundY = g.y;
+                            foundGround = true;
+                        }
+                    }
+                });
+                if (foundGround) character.groundY = closestGroundY;
+            }
+
+            if (character.isJumping) {
+                character.velocityY += character.gravity;
+                character.y += character.velocityY;
+                if (!ignoreCollision && character.y + character.height >= character.groundY && character.velocityY > 0) {
+                    character.y = character.groundY - character.height;
+                    character.isJumping = false;
+                    character.velocityY = 0;
+                }
+            }
+            if (character.isFlyingUp) {
+                character.y -= flyUpSpeed;
+            } else if (character.isFlyingDown) {
+                character.y += flyDownSpeed;
+            }
+            if ((character.isBoost || character.isTurbo) && !character.isFlyingUp && !character.isFlyingDown) {
+                if (keys['w']) { character.y -= flyUpSpeed; }
+                if (keys['s']) { character.y += flyDownSpeed; }
+            }
+            if (character.isLanding) {
+                character.velocityY += character.gravity * 0.5;
+                character.y += character.velocityY;
+                if (!ignoreCollision && character.y + character.height >= character.groundY) {
+                    character.y = character.groundY - character.height;
+                    character.velocityY = 0;
+                }
+            }
+            
+            character.isMoving = false;
+            if (!character.isGlowing) {
+                if (keys['a']) { character.x -= currentSpeed; character.direction = 'left'; character.isMoving = true; }
+                if (keys['d']) { character.x += currentSpeed; character.direction = 'right'; character.isMoving = true; }
+            }
+
+            const charCenterX = character.x + character.width / 2;
+            const charCenterY = character.y + character.height / 2;
+
+            // === FIND NEXT TARGET STAR ===
+            const nextTargetStar = stars.find(s => !s.found);
+
+            for (let i = 0; i < stars.length; i++) {
+                let star = stars[i];
+                if (!star.found) {
+                    const dist = Math.hypot(charCenterX - star.x, charCenterY - star.y);
+                    if (dist < STAR_INTERACTION_RADIUS) {
+                        star.found = true;
+                        showToast(`ANCIENT STAR ${star.id + 1} FOUND!`, 'star');
+                        addFloatingText(`STAR DISCOVERED!`, star.x, star.y - 50, '#FFD700');
+                        collectedEnergy += 100;
+                        collectedEther += 50;
+                    }
+                }
+            }
+
+            // === AUREL LEAD THE WAY LOGIC ===
+            if (nextTargetStar) {
+                energyOrbs.forEach(orb => {
+                    if (orb.isAurel) {
+                        const dx = nextTargetStar.x - orb.x;
+                        const dy = nextTargetStar.y - orb.y;
+                        const distToTarget = Math.hypot(dx, dy);
+                        
+                        if (distToTarget > 10) {
+                            orb.x += (dx / distToTarget) * 1.5; 
+                            orb.y += (dy / distToTarget) * 1.5;
+                            orb.baseY = orb.y; 
+                        }
+                    }
+                });
+            }
+
+            for (let i = geometricCores.length - 1; i >= 0; i--) {
+                let core = geometricCores[i];
+                core.y += Math.sin(now / 500 + core.floatOffset) * 0.5;
+                core.pulse += 0.05;
+
+                const dist = Math.hypot(charCenterX - core.x, charCenterY - core.y);
+                if (dist < 200) {
+                    core.x += (charCenterX - core.x) * 0.03;
+                    core.y += (charCenterY - core.y) * 0.03;
+                }
+                
+                if (dist < 60) {
+                    collectedEther += 50; 
+                    addFloatingText(`+50 ETHER`, core.x, core.y - 20, '#E0B0FF');
+                    geometricCores.splice(i, 1);
+                }
+            }
+
+            const handleMerge = (particles, type) => {
+                const len = particles.length;
+                if (len === 0) return;
+
+                for (let i = 0; i < len; i++) {
+                    let pA = particles[i];
+                    if (pA.isAurel) continue;
+
+                    // Cull: Only find merges if on screen or close
+                    if (pA.x < viewLeft - 2000 || pA.x > viewRight + 2000) continue;
+
+                    if (pA.mergeTarget) {
+                        let pB = particles.find(o => o.id === pA.mergeTarget);
+                        if (pB && pB.isAurel) {
+                            pA.mergeTarget = null;
+                            pA.mergeStartTime = 0;
+                            continue;
+                        }
+                        if (pB) {
+                            let dist = Math.hypot(pA.x - pB.x, pA.y - pB.y);
+                            if (dist < MERGE_DISTANCE) {
+                                if (!pA.mergeStartTime) pA.mergeStartTime = now;
+                                if (now - pA.mergeStartTime > MERGE_TIME_SEC * 1000) {
+                                    if (type === 'ether' && pA.value >= ATMOSPHERE_THRESHOLD) {
+                                        geometricCores.push({
+                                            x: (pA.x + pB.x) / 2,
+                                            y: (pA.y + pB.y) / 2,
+                                            outerSize: 40,
+                                            innerSize: 20,
+                                            color: '#9D00FF',
+                                            innerColor: '#D500F9',
+                                            pulse: 0,
+                                            floatOffset: Math.random() * Math.PI * 2
+                                        });
+                                        particles.splice(i, 1); 
+                                        const idxB = particles.indexOf(pB);
+                                        if (idxB > -1) { 
+                                            particles.splice(idxB, 1); 
+                                            if (idxB < i) i--; 
+                                            return;
+                                        }
+                                        break;
+                                    }
+                                    pA.value += pB.value;
+                                    pA.size = (type==='ether' ? ETHER_SIZE_BASE :4) + (pA.value * 2);
+                                    pA.mergeTarget = null; pA.mergeStartTime = 0;
+                                    const idxB = particles.indexOf(pB);
+                                    if (idxB > -1) { 
+                                        particles.splice(idxB, 1); 
+                                        if (idxB < i) i--; 
+                                    }
+                                }
+                            } else {
+                                pA.mergeTarget = null; pA.mergeStartTime = 0;
+                            }
+                        } else {
+                            pA.mergeTarget = null; pA.mergeStartTime = 0;
+                        }
+                    } else {
+                        for (let j = i + 1; j < len; j++) {
+                            let pB = particles[j];
+                            if (pB.mergeTarget || pB.isAurel) continue;
+                            
+                            let dist = Math.hypot(pA.x - pB.x, pA.y - pB.y);
+                            if (dist < MERGE_DISTANCE) {
+                                pA.mergeTarget = pB.id; pA.mergeStartTime = now; break;
+                            }
+                        }
+                    }
+                }
+            };
+
+            handleMerge(energyOrbs, 'energy');
+            handleMerge(etherPixels, 'ether');
+
+            // === ENERGY ORBS UPDATE (WITH CULLING) ===
+            for (let i = energyOrbs.length - 1; i >= 0; i--) {
+                let orb = energyOrbs[i];
+                if (orb.x < viewLeft - 500 || orb.x > viewRight + 500 || orb.y < viewTop - 500 || orb.y > viewBottom + 500) continue;
+
+                if (orb.mergeTarget) {
+                    let target = energyOrbs.find(o => o.id === orb.mergeTarget);
+                    if (target) { orb.x += (target.x - orb.x) * 0.02; orb.y += (target.y - orb.y) * 0.02; }
+                }
+                orb.x += orb.vx;
+                orb.angleOffset += orb.floatSpeed;
+                if(!orb.isAurel) {
+                    orb.y = orb.baseY + Math.sin(orb.angleOffset) * 10;
+                }
+                const dist = Math.hypot(charCenterX - orb.x, charCenterY - orb.y);
+                if (dist < 100) { orb.x += (charCenterX - orb.x) * 0.1; orb.y += (charCenterY - orb.y) * 0.1; }
+                if (dist < 40) {
+                    if (orb.isAurel) {
+                        collectedAurels += orb.value; 
+                        addFloatingText(`+${orb.value} AUREL`, orb.x, orb.y - 10, '#FFD700');
+                    } else {
+                        collectedEnergy += orb.value;
+                        addFloatingText(`+${orb.value} Energy`, orb.x, orb.y - 10, '#00FFFF');
+                    }
+                    energyOrbs.splice(i, 1);
+                }
+            }
+            // ====================================
+
+            // === ETHER PIXELS UPDATE (WITH CULLING) ===
+            for (let i = etherPixels.length - 1; i >= 0; i--) {
+                let ether = etherPixels[i];
+                if (ether.x < viewLeft - 500 || ether.x > viewRight + 500 || ether.y < viewTop - 500 || ether.y > viewBottom + 500) continue;
+
+                if (ether.mergeTarget) {
+                    let target = etherPixels.find(o => o.id === ether.mergeTarget);
+                    if (target) { ether.x += (target.x - ether.x) * 0.02; ether.y += (target.y - ether.y) * 0.02; }
+                }
+                ether.x += ether.vx;
+                ether.angleOffset += ether.floatSpeed;
+                ether.y = ether.baseY + Math.sin(ether.angleOffset) * 10;
+                const dist = Math.hypot(charCenterX - ether.x, charCenterY - ether.y);
+                if (dist < 60) { ether.x += (charCenterX - ether.x) * 0.05; ether.y += (charCenterY - ether.y) * 0.05; }
+                if (dist < 35) {
+                    collectedEther += ether.value;
+                    if (Math.random() > 0.7) addFloatingText(`+${ether.value} Ether`, ether.x, ether.y - 10, '#E0B0FF');
+                    etherPixels.splice(i, 1);
+                }
+            }
+            // =========================================
+
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                floatingTexts[i].y -= 0.5;
+                floatingTexts[i].life--;
+                if (floatingTexts[i].life <= 0) floatingTexts.splice(i, 1);
+            }
+
+            if (character.isLanding) {
+                character.landFrameCounter++;
+                if (character.landFrameCounter >= character.landFrameDelay) {
+                    character.landFrameCounter = 0;
+                    character.landFrameIndex++;
+                    if (character.landFrameIndex >= character.landFrameCount) {
+                        character.isLanding = false; character.landFrameIndex = 0;
+                        character.velocityY = 0; character.idleFrameIndex = 0;
+                    }
+                }
+            } else if (character.isTurbo) {
+                character.turboFrameCounter++;
+                if (character.turboFrameCounter >= character.turboFrameDelay) {
+                    character.turboFrameCounter = 0;
+                    character.turboFrameIndex = (character.turboFrameIndex + 1) % character.turboFrameCount;
+                }
+                character.turboBoostCounter++;
+                if (character.turboBoostCounter >= character.turboBoostFrameDelay) {
+                    character.turboBoostCounter = 0;
+                    character.turboBoostFrameIndex = (character.turboBoostFrameIndex + 1) % character.turboBoostFrameCount;
+                }
+            } else if (character.isBoost) {
+                character.boostFrameCounter++;
+                if (character.boostFrameCounter >= character.boostFrameDelay) {
+                    character.boostFrameCounter = 0;
+                    character.boostFrameIndex = (character.boostFrameIndex + 1) % character.boostFrameCount;
+                }
+            } else if (character.isFlyingDown) {
+                character.flyDownFrameCounter++;
+                if (character.flyDownFrameCounter >= character.flyDownFrameDelay) {
+                    character.flyDownFrameCounter = 0;
+                    character.flyDownFrameIndex = (character.flyDownFrameIndex + 1) % character.flyDownFrameCount;
+                }
+            } else if (character.isFlyingUp) {
+                character.flyUpFrameCounter++;
+                if (character.flyUpFrameCounter >= character.flyUpFrameDelay) {
+                    character.flyUpFrameCounter = 0;
+                    character.flyUpFrameIndex = (character.flyUpFrameIndex + 1) % character.flyUpFrameCount;
+                }
+            } else if (character.isFloating) {
+                character.floatFrameCounter++;
+                if (character.floatFrameCounter >= character.floatFrameDelay) {
+                    character.floatFrameCounter = 0;
+                    character.floatFrameIndex = (character.floatFrameIndex + 1) % character.floatFrameCount;
+                }
+            } else if (character.isGlowing) {
+                character.glowingFrameCounter++;
+                if (character.glowingFrameCounter >= character.glowingFrameDelay) {
+                    character.glowingFrameCounter = 0;
+                    character.glowingFrameIndex++;
+                    if (character.glowingFrameIndex >= character.glowingFrameCount) {
+                        character.isGlowing = false; character.glowingFrameIndex = 0;
+                        character.idleFrameIndex = 0; character.idleFrameCounter = 0;
+                    }
+                }
+            } else if (character.isJumping) {
+                character.jumpFrameCounter++;
+                if (character.jumpFrameCounter >= character.jumpFrameDelay) {
+                    character.jumpFrameCounter = 0;
+                    if (character.jumpFrameIndex < character.jumpFrameCount - 1) character.jumpFrameIndex++;
+                }
+            } else if (character.isMoving) {
+                character.walkFrameCounter++;
+                if (character.walkFrameCounter >= character.walkFrameDelay) {
+                    character.walkFrameCounter = 0;
+                    character.walkFrameIndex = (character.walkFrameIndex + 1) % character.walkFrameCount;
+                }
+            } else {
+                character.idleFrameCounter++;
+                if (character.idleFrameCounter >= character.idleFrameDelay) {
+                    character.idleFrameCounter = 0;
+                    character.idleFrameIndex = (character.idleFrameIndex + 1) % character.idleFrameCount;
+                }
+            }
+
+            particleLayer.frameCounter++;
+            if (particleLayer.frameCounter >= particleLayer.frameDelay) {
+                particleLayer.frameCounter = 0;
+                particleLayer.frameIndex = (particleLayer.frameIndex + 1) % particleCount;
+            }
+            background.frameCounter++;
+            if (background.frameCounter >= background.frameDelay) {
+                background.frameCounter = 0;
+                background.frameIndex = (background.frameIndex + 1) % background.frameCount;
+            }
+            treeLayer.frameCounter++;
+            if (treeLayer.frameCounter >= treeLayer.frameDelay) {
+                treeLayer.frameCounter = 0;
+                treeLayer.frameIndex = (treeLayer.frameIndex + 1) % treeLayerFrameCount;
+            }
+            newBackgroundLayer.frameCounter++;
+            if (newBackgroundLayer.frameCounter >= newBackgroundLayer.frameDelay) {
+                newBackgroundLayer.frameCounter = 0;
+                newBackgroundLayer.frameIndex = (newBackgroundLayer.frameIndex + 1) % newBackgroundLayer.frameCount;
+            }
+            newBackground2Layer.frameCounter++;
+            if (newBackground2Layer.frameCounter >= newBackground2Layer.frameDelay) {
+                newBackground2Layer.frameCounter = 0;
+                newBackground2Layer.frameIndex = (newBackground2Layer.frameIndex + 1) % newBackground2Layer.frameCount;
+            }
+        }
+        
+        function drawTiledLayer(layer) {
+            const img = layer.frames[layer.frameIndex];
+            if (!img || !img.complete || img.naturalHeight === 0) return;
+            const tileW = img.naturalWidth * layer.scale;
+            const tileH = canvas.height; 
+            const worldOffset = (character.x * layer.parallaxFactor);
+            const offsetX = -(worldOffset % tileW);
+            let startX = offsetX - tileW; 
+            const count = Math.ceil(canvas.width / tileW) + 2;
+            for (let i = 0; i < count; i++) ctx.drawImage(img, startX + (i * tileW), 0, tileW, tileH);
+        }
+
+        const drawParallax = (layer, scale = 1, parallaxFactor = 1) => {
+            const img = layer.frames[layer.frameIndex];
+            if (img && img.complete && img.naturalHeight !== 0) {
+                const w = canvas.width * scale, h = canvas.height * scale;
+                const offsetX = -(character.x * parallaxFactor) % w;
+                const drawX = offsetX < 0 ? offsetX + w : offsetX; 
+                for (let dx = -2; dx <= 2; dx++) ctx.drawImage(img, drawX + dx * w, 0, w, h);
+            }
+        };
+
+        const drawStaticLeft = (layer, scale = 1) => {
+            const img = layer.frames[layer.frameIndex];
+            if (img && img.complete && img.naturalHeight !== 0) {
+                const w = canvas.width * scale, h = canvas.height * scale;
+                ctx.drawImage(img, 0, 0, w, h);
+            }
+        };
+
+        function drawPixelStar(ctx, x, y, size, color, alpha, pulse, isFound) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = color;
+
+            if (isFound) {
+                const haloSize = size * 4 + (Math.sin(Date.now() / 300) * 5);
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.05)';
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.arc(0, 0, haloSize, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.shadowColor = '#FFFFFF';
+                ctx.shadowBlur = 15 + (pulse * 5); 
+            } else {
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 8 + (pulse * 2);
+            }
+
+            ctx.fillRect(-size/2, -size/2, size, size);
+            
+            const tipLen = size * 2;
+            const tipW = size * 0.4;
+            ctx.fillRect(-tipLen/2, -tipW/2, tipLen, tipW);
+            ctx.fillRect(-tipW/2, -tipLen/2, tipW, tipLen);
+            
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(-1, -1, 2, 2);
+            
+            ctx.restore();
+        }
+
+        function drawMiniMap() {
+            const mapX = canvas.width - 210;
+            const mapY = 20;
+            const mapW = 200;
+            const mapH = 200;
+            const scale = 0.05;
+
+            ctx.save();
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(mapX, mapY, mapW, mapH);
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(mapX, mapY, mapW, mapH);
+
+            ctx.translate(mapX + mapW / 2, mapY + mapH / 2);
+
+            activeForestCenters.forEach(center => {
+                const relX = center.x - character.x;
+                const relY = center.y - character.y;
+                const drawX = relX * scale;
+                const drawY = relY * scale;
+                const radius = Math.sqrt((drawX*drawX) + (drawY*drawY));
+                const maxRadius = (mapW / 2) - 10;
+                
+                if (radius < maxRadius) {
+                    ctx.fillStyle = 'rgba(255, 215, 0, 0.3)'; 
+                    ctx.beginPath();
+                    ctx.arc(drawX, drawY, 20, 0, Math.PI * 2); 
+                    ctx.fill();
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.arc(drawX, drawY, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    const angle = Math.atan2(relY, relX);
+                    const arrowLen = maxRadius - 5;
+                    ctx.save();
+                    ctx.rotate(angle);
+                    ctx.translate(arrowLen, 0);
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(-5, -5);
+                    ctx.lineTo(-5, 5);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            });
+
+            const foundStars = stars.filter(s => s.found).sort((a,b) => a.id - b.id);
+            if (foundStars.length > 1) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; 
+                ctx.lineWidth = 1;
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                const startX = (foundStars[0].x - character.x) * scale;
+                const startY = (foundStars[0].y - character.y) * scale;
+                ctx.moveTo(startX, startY);
+                for (let i = 1; i < foundStars.length; i++) {
+                    const drawX = (foundStars[i].x - character.x) * scale;
+                    const drawY = (foundStars[i].y - character.y) * scale;
+                    ctx.lineTo(drawX, drawY);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            stars.forEach(star => {
+                if (star.found) {
+                    const relX = star.x - character.x;
+                    const relY = star.y - character.y;
+                    const drawX = relX * scale;
+                    const drawY = relY * scale;
+                    const radius = Math.sqrt((drawX*drawX) + (drawY*drawY));
+                    const maxRadius = (mapW / 2) - 5;
+                    
+                    if (radius < maxRadius) {
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.beginPath();
+                        ctx.moveTo(drawX - 4, drawY);
+                        ctx.lineTo(drawX + 4, drawY);
+                        ctx.moveTo(drawX, drawY - 4);
+                        ctx.lineTo(drawX, drawY + 4);
+                        ctx.stroke();
+                        
+                        ctx.shadowColor = '#FFFFFF';
+                        ctx.shadowBlur = 5;
+                        ctx.fillRect(drawX - 2, drawY - 2, 4, 4);
+                    } else {
+                        const angle = Math.atan2(relY, relX);
+                        const arrowLen = maxRadius - 2;
+                        ctx.save();
+                        ctx.rotate(angle);
+                        ctx.translate(arrowLen, 0);
+                        ctx.strokeStyle = '#FFFFFF';
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(-3, -3);
+                        ctx.lineTo(-3, 3);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                }
+            });
+
+            ctx.fillStyle = '#00FFFF'; 
+            ctx.beginPath();
+            ctx.arc(0, 0, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.save();
+            if (character.direction === 'left') ctx.rotate(Math.PI);
+            else ctx.rotate(0);
+            
+            ctx.beginPath();
+            ctx.moveTo(8, 0);
+            ctx.lineTo(0, -5);
+            ctx.lineTo(0, 5);
+            ctx.closePath();
+            ctx.fillStyle = '#00FFFF';
+            ctx.fill();
+            
+            ctx.restore();
+
+            ctx.fillStyle = '#AAA';
+            ctx.font = 'bold 12px Courier New';
+            ctx.fillText("RADAR", -20, -mapH/2 + 15);
+
+            ctx.restore();
+        }
+        
+        function draw() {
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            
+            ctx.translate(cameraOffsetX, cameraOffsetY);
+            ctx.scale(zoom, zoom);
+            ctx.translate(-character.x - character.width / 2, -character.y - character.height / 2);
+            
+            drawTiledLayer(particleLayer);
+            drawParallax(background, 1, 0.05); 
+            drawParallax(treeLayer, 1.5, 0.15);
+            
+            grounds.forEach(g => {
+                if (g.type === 'particle') {
+                    const img = particleLayer.frames[particleLayer.frameIndex];
+                    if (img && img.complete) {
+                        const tileW = img.naturalWidth;
+                        const tileH = img.naturalHeight;
+                        if (g.width) {
+                            const drawY = g.y - (tileH / 2);
+                            const startTile = Math.floor(g.x / tileW);
+                            const endTile = Math.ceil((g.x + g.width) / tileW);
+                            for (let t = startTile; t <= endTile; t++) {
+                                const xPos = t * tileW;
+                                ctx.drawImage(img, xPos, drawY, tileW, tileH);
+                            }
+                        } else {
+                            const count = Math.ceil(canvas.width / tileW) + 2;
+                            const offsetX = -(character.x % tileW) - tileW;
+                            ctx.save();
+                            ctx.translate(0, g.y - (tileH/2));
+                            for (let i = 0; i < count; i++) ctx.drawImage(img, offsetX + (i * tileW), 0, tileW, tileH);
+                            ctx.restore();
+                        }
+                    }
+                }
+            });
+
+            const now = Date.now();
+            
+            // === CULLING BOUNDS FOR DRAWING ===
+            const viewPaddingDraw = 500;
+            const viewLeft = character.x - (canvas.width / zoom) - viewPaddingDraw;
+            const viewRight = character.x + (canvas.width / zoom) + viewPaddingDraw;
+            const viewTop = character.y - (canvas.height / zoom) - viewPaddingDraw;
+            const viewBottom = character.y + (canvas.height / zoom) + viewPaddingDraw;
+            // =====================================
+
+            // === CONSTELLATION LINES (MAIN GAME) ===
+            const foundStars = stars.filter(s => s.found).sort((a,b) => a.id - b.id);
+            if (foundStars.length > 1) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; 
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 0; 
+                ctx.globalAlpha = 0.3;
+                ctx.beginPath();
+                ctx.moveTo(foundStars[0].x, foundStars[0].y);
+                for (let i = 1; i < foundStars.length; i++) {
+                    ctx.lineTo(foundStars[i].x, foundStars[i].y);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+            // ========================================
+
+            stars.forEach(star => {
+                // Draw Star if visible
+                if (star.x < viewLeft - 500 || star.x > viewRight + 500 || 
+                    star.y < viewTop - 500 || star.y > viewBottom + 500) return;
+
+                const dist = Math.hypot(character.x - star.x, character.y - star.y);
+                let alpha = 0;
+                
+                if (star.found) {
+                    alpha = 1; 
+                } else if (dist < STAR_VISIBILITY_RANGE) {
+                    alpha = 1 - (dist / STAR_VISIBILITY_RANGE);
+                }
+
+                if (alpha > 0) {
+                    const pulse = Math.sin(now / 200 + star.pulseOffset);
+                    const baseSize = 10 * star.sizeVariation;
+                    
+                    drawPixelStar(ctx, star.x, star.y, baseSize, star.colorVar, alpha, pulse, star.found);
+                    
+                    if (!star.found && dist < 300 && dist > 100) {
+                        if (Math.floor(now / 1000) % 2 === 0) { 
+                            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                            ctx.font = '12px Courier New';
+                            ctx.textAlign = 'center';
+                            ctx.fillText("?", star.x, star.y - 40);
+                        }
+                    }
+                }
+            });
+
+            // === DRAW ENERGY ORBS (CULLED) ===
+            for (let i = 0; i < energyOrbs.length; i++) {
+                let orb = energyOrbs[i];
+                // Culling check
+                if (orb.x < viewLeft - 500 || orb.x > viewRight + 500 || orb.y < viewTop - 500 || orb.y > viewBottom + 500) continue;
+
+                if (orb.mergeTarget) {
+                    const target = energyOrbs.find(o => o.id === orb.mergeTarget);
+                    if (target) {
+                        ctx.save(); ctx.strokeStyle = orb.color; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+                        ctx.beginPath(); ctx.moveTo(orb.x, orb.y); ctx.lineTo(target.x, target.y); ctx.stroke(); ctx.restore();
+                    }
+                }
+                ctx.save(); ctx.shadowColor = orb.color; ctx.shadowBlur = 15; ctx.fillStyle = orb.color;
+                const jitterX = (Math.random() - 0.5) * orb.pixelJitter;
+                const jitterY = (Math.random() - 0.5) * orb.pixelJitter;
+                const drawSize = orb.size;
+                
+                if (orb.isAurel) {
+                     ctx.beginPath();
+                    ctx.moveTo(orb.x + jitterX, orb.y + jitterY - drawSize);
+                    ctx.lineTo(orb.x + jitterX + drawSize, orb.y + jitterY);
+                    ctx.lineTo(orb.x + jitterX, orb.y + jitterY + drawSize);
+                    ctx.lineTo(orb.x + jitterX - drawSize, orb.y + jitterY);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    ctx.fillRect(orb.x + jitterX - 1, orb.y + jitterY - 1, 2, 2);
+                } else {
+                    ctx.fillRect(orb.x + jitterX - drawSize/2, orb.y + jitterY - drawSize/2, drawSize, drawSize);
+                }
+
+                if (orb.value > 1) {
+                    ctx.fillStyle = '#000'; ctx.font = '10px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(orb.value, orb.x + jitterX, orb.y + jitterY);
+                }
+                if (!orb.isAurel && Math.random() > 0.7) { ctx.globalAlpha = 0.6; ctx.fillRect(orb.x + jitterX - drawSize, orb.y + jitterY - drawSize, drawSize/2, drawSize/2); }
+                ctx.restore();
+            }
+            // =======================================
+
+            // === DRAW ETHER PIXELS (CULLED) ===
+            for (let i = 0; i < etherPixels.length; i++) {
+                let ether = etherPixels[i];
+                if (ether.x < viewLeft - 500 || ether.x > viewRight + 500 || ether.y < viewTop - 500 || ether.y > viewBottom + 500) continue;
+
+                if (ether.mergeTarget) {
+                    const target = etherPixels.find(o => o.id === ether.mergeTarget);
+                    if (target) {
+                        ctx.save(); ctx.strokeStyle = ether.color; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+                        ctx.beginPath(); ctx.moveTo(ether.x, ether.y); ctx.lineTo(target.x, target.y); ctx.stroke(); ctx.restore();
+                    }
+                }
+                ctx.save(); ctx.shadowColor = ether.color; ctx.shadowBlur = 10; ctx.fillStyle = ether.color;
+                const jitterX = (Math.random() - 0.5) * ether.pixelJitter;
+                const jitterY = (Math.random() - 0.5) * ether.pixelJitter;
+                const drawSize = ether.size;
+                ctx.fillRect(ether.x + jitterX - drawSize/2, ether.y + jitterY - drawSize/2, drawSize, drawSize);
+                if (ether.value > 1) {
+                    ctx.fillStyle = '#FFF'; ctx.font = '10px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(ether.value, ether.x + jitterX, ether.y + jitterY);
+                }
+                if (Math.random() > 0.8) { ctx.globalAlpha = 0.8; ctx.fillStyle = '#FFFFFF'; ctx.fillRect(ether.x + jitterX, ether.y + jitterY, 1, 1); }
+                ctx.restore();
+            }
+            // =========================================
+
+            geometricCores.forEach(core => {
+                // Cull Cores
+                if (core.x < viewLeft - 500 || core.x > viewRight + 500 || core.y < viewTop - 500 || core.y > viewBottom + 500) return;
+
+                ctx.save();
+                ctx.translate(core.x, core.y);
+                const scale = 1 + Math.sin(core.pulse) * 0.1;
+                ctx.scale(scale, scale);
+                ctx.fillStyle = core.color;
+                ctx.shadowColor = core.color;
+                ctx.shadowBlur = 15;
+                ctx.fillRect(-core.outerSize / 2, -core.outerSize / 2, core.outerSize, core.outerSize);
+                ctx.fillStyle = core.innerColor;
+                ctx.shadowBlur = 5;
+                ctx.fillRect(-core.innerSize / 2, -core.innerSize / 2, core.innerSize, core.innerSize);
+                ctx.restore();
+            });
+            
+            if (character.isTurbo) {
+                const pivotX = character.x + character.width / 2 + turboCharOffsetX;
+                const pivotY = character.y + character.height / 2 + turboCharOffsetY;
+                const facingRight = character.direction === 'right';
+                const scaleX = facingRight ? 1 : -1;
+
+                ctx.save();
+                ctx.translate(pivotX, pivotY);
+                ctx.scale(scaleX, 1);
+
+                const tailImg = character.turboBoostFrames[character.turboBoostFrameIndex];
+                if (tailImg && tailImg.complete && tailImg.naturalHeight !== 0) {
+                    const tailW = character.width * turboBoostWidthScale;
+                    const tailH = character.height * turboBoostHeightScale;
+                    ctx.save(); ctx.rotate(turboBoostRotationAngle * (Math.PI / 180));
+                    ctx.drawImage(tailImg, -tailW/2 + turboBoostOffsetX, -tailH/2 + turboBoostOffsetY, tailW, tailH); ctx.restore();
+                } else {
+                    ctx.fillStyle = 'orange'; ctx.fillRect(-100 - 303, -20, 100, 40); 
+                }
+
+                const bodyImg = character.turboFrames[character.turboFrameIndex];
+                if (bodyImg && bodyImg.complete && bodyImg.naturalHeight !== 0) {
+                    const bodyW = character.width * turboCharWidthScale;
+                    const bodyH = character.height * turboCharHeightScale;
+                    ctx.save(); ctx.rotate(turboCharRotationAngle * (Math.PI / 180));
+                    ctx.drawImage(bodyImg, -bodyW/2, -bodyH/2, bodyW, bodyH); ctx.restore();
+                } else {
+                    ctx.fillStyle = '#FF0000';
+                    ctx.fillRect(-character.width/2, -character.height/2, character.width, character.height);
+                }
+                ctx.restore();
+            }
+
+            let img;
+            if (character.isLanding) img = character.landFrames[character.landFrameIndex];
+            else if (character.isTurbo) { /* Handled above */ }
+            else if (character.isBoost) img = character.boostFrames[character.boostFrameIndex];
+            else if (character.isFlyingDown) img = character.flyDownFrames[character.flyDownFrameIndex];
+            else if (character.isFlyingUp) img = character.flyUpFrames[character.flyUpFrameIndex];
+            else if (character.isFloating) img = character.floatFrames[character.floatFrameIndex];
+            else if (character.isGlowing) img = character.glowingFrames[character.glowingFrameIndex];
+            else if (character.isJumping) img = character.jumpFrames[character.jumpFrameIndex];
+            else if (character.isMoving) img = character.walkFrames[character.walkFrameIndex];
+            else img = character.idleFrames[character.idleFrameIndex];
+            
+            if (!character.isTurbo && img) {
+                if (img.complete && img.naturalHeight !== 0) {
+                    const w = character.width; const h = character.height;
+                    const x = character.x; const y = character.y;
+                    ctx.save(); ctx.translate(x + w / 2, y + h / 2);
+                    if (collectedEnergy > 0) {
+                        const pulse = Math.sin(Date.now() / 200) * 5; 
+                        const auraIntensity = Math.min(collectedEnergy * 3, 80) + pulse; 
+                        ctx.shadowColor = collectedEnergy >= ENERGY_COST_TO_PLANT ? '#FFD700' : '#00FFFF'; 
+                        ctx.shadowBlur = Math.max(10, auraIntensity);
+                    }
+                    if (character.isBoost) { if (character.direction === 'left') ctx.scale(-1, 1); }
+                    else { if (character.direction === 'right') ctx.scale(-1, 1); }
+                    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+                    ctx.restore();
+                } else {
+                    const colors = ['#4CAF50', '#4CAF50', '#FF5722', '#FFD700', '#00BFFF', '#E91E63', '#FF6F00', '#FFFF00', '#00FF00', '#9C27B0'];
+                    const states = [0, character.isMoving, character.isJumping, character.isGlowing, character.isFloating, character.isFlyingUp, character.isFlyingDown, character.isBoost, character.isTurbo, character.isLanding];
+                    ctx.fillStyle = colors[states.indexOf(true)];
+                    ctx.fillRect(character.x, character.y, character.width, character.height);
+                    ctx.fillStyle = '#fff'; ctx.beginPath();
+                    const eyeX = character.direction === 'left' ? character.x + 38 : character.x + 90;
+                    ctx.arc(eyeX, character.y + 20, 8, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+
+            // === DRAW WORLD OBJECTS (TREES) CULLED ===
+            for (let i = 0; i < worldObjects.length; i++) {
+                let obj = worldObjects[i];
+                if (obj.x > viewLeft - 200 && obj.x < viewRight + 200) {
+                    let tImg; let scale;
+                    if (obj.state === 'growing') { tImg = plantFrames[obj.frameIndex]; scale = obj.plantScale || 1.0; }
+                    else if (obj.state === 'growing-new-tree') { tImg = newTreeFrames[obj.frameIndex]; scale = obj.treeScale || 1.0; }
+                    else if (obj.state === 'grown-new-tree') { tImg = newTreeFrames[obj.frameIndex]; scale = obj.treeScale || 1.0; }
+                    else { tImg = treeLayer.frames[obj.frameIndex]; scale = obj.treeScale || 1.0; }
+                    
+                    let inActiveForest = false;
+                    
+                    if (activeForestCenters.length > 0 && (obj.state === 'grown' || obj.state === 'grown-new-tree')) {
+                        for(let c=0; c<activeForestCenters.length; c++){
+                            const distToCenter = Math.hypot(obj.x - activeForestCenters[c].x, obj.y - activeForestCenters[c].y);
+                            if (distToCenter < FOREST_CLUSTER_RADIUS) inActiveForest = true;
+                        }
+                    }
+                    
+                    if (tImg && tImg.complete && tImg.naturalHeight !== 0) {
+                        const scaledWidth = tImg.width * scale;
+                        const scaledHeight = tImg.height * scale;
+                        const drawX = obj.x - (scaledWidth / 2);
+                        const drawY = obj.y - scaledHeight;
+                        ctx.save();
+                        if (obj.state === 'grown' || obj.state === 'grown-new-tree') ctx.globalAlpha = 0.5 + (obj.depthLayer * 0.25);
+                        if (inActiveForest) {
+                            const pulse = Math.sin(Date.now() / 200) * 10 + 20;
+                            ctx.shadowColor = '#FFD700'; ctx.shadowBlur = pulse; ctx.globalCompositeOperation = 'source-over';
+                        }
+                        ctx.drawImage(tImg, drawX, drawY, scaledWidth, scaledHeight);
+                        ctx.restore();
+                    } else {
+                        if (obj.state === 'growing' || obj.state === 'growing-new-tree') {
+                            ctx.fillStyle = `rgba(100, 255, 100, ${obj.frameIndex / plantCount})`;
+                            const size = (20 + (obj.frameIndex * 2)) * scale;
+                            ctx.fillRect(obj.x - size/2, obj.y - size, size, size);
+                        } else {
+                            ctx.fillStyle = '#228B22';
+                            ctx.fillRect(obj.x - 30 * scale, obj.y - 80 * scale, 60 * scale, 80 * scale);
+                        }
+                    }
+                }
+            }
+            // ==========================================
+
+            floatingTexts.forEach(ft => {
+                ctx.save(); ctx.font = 'bold 16px Arial'; ctx.fillStyle = ft.color;
+                ctx.shadowColor = 'black'; ctx.shadowBlur = 4; ctx.fillText(ft.text, ft.x, ft.y); ctx.restore();
+            });
+            
+            ctx.restore();
+            
+            if (showUI) {
+                drawMiniMap();
+
+                ctx.fillStyle = '#fff'; ctx.font = '16px Courier New'; ctx.textAlign = 'left';
+                const controls = [
+                    'A / D : Move Left/Right', 'SPACE (x1) : Jump',
+                    'SPACE (x2 - Air) : Float', 'SPACE (x3) : Land',
+                    'W : Fly Up / Takeoff', 'S : Fly Down / Phase Through',
+                    'G : Glowing', `P / O : Plant Tree (Cost: ${ENERGY_COST_TO_PLANT} Energy)`, 
+                    'Forest: Cluster Trees', 'SHIFT + A/D : Boost', 'Hold SHIFT 3s : Turbo',
+                    `B : Build Ground Platform (Cost: ${NEW_GROUND_COST_ETHER} Ether)`,
+                    'Scroll : Zoom (' + zoom.toFixed(1) + 'x)', 'H : Hide UI', 'ESC : Menu'
+                ];
+                controls.forEach((text, i) => ctx.fillText(text, 20, 30 + i * 20));
+                
+                const stateNames = ['Idle', 'Walking', 'Jumping', 'Glowing', 'Floating', 'Flying Up', 'Flying Down', 'BOOST!', 'TURBO!', 'Landing'];
+                const stateColors = ['#FFC107', '#4CAF50', '#FF5722', '#FFD700', '#00BFFF', '#E91E63', '#FF6F00', '#FFFF00', '#00FF00', '#9C27B0'];
+                const stateIdx = [0, character.isMoving, character.isJumping, character.isGlowing, character.isFloating, character.isFlyingUp, character.isFlyingDown, character.isBoost, character.isTurbo, character.isLanding].lastIndexOf(true);
+                ctx.fillStyle = stateColors[stateIdx];
+                ctx.fillText('State: ' + stateNames[stateIdx], 20, 330);
+                
+                const timeUntilWave = ((AUTO_SPAWN_INTERVAL_MS - (Date.now() - lastAutoSpawnTime)) / 1000).toFixed(0);
+                
+                ctx.fillStyle = '#AAAAAA'; ctx.fillText(`Next Wave: ${timeUntilWave}s`, 20, 350);
+                
+                if (activeForestCenters.length > 0) {
+                    const timeUntilAurel = ((AUREL_SPAWN_RATE_MS - (Date.now() - lastAurelSpawnTime)) / 1000).toFixed(0);
+                    ctx.fillStyle = '#FFD700'; ctx.fillText(`Next Forest Aurel: ${timeUntilAurel}s`, 20, 370);
+                } else {
+                    ctx.fillStyle = '#555'; ctx.fillText("Next Forest Aurel: No Forest", 20, 370);
+                }
+
+                if (activeForestCenters.length > 0) { 
+                    ctx.fillStyle = '#FFD700'; 
+                    ctx.fillText(`FORESTS ACTIVE: ${activeForestCenters.length}`, 20, 390); 
+                } else { 
+                    ctx.fillStyle = '#555'; 
+                    ctx.fillText("Forest: Inactive (Need cluster)", 20, 390); 
+                }
+
+                const foundCount = stars.filter(s => s.found).length;
+                ctx.fillStyle = '#FFD700';
+                ctx.shadowColor = '#FFD700';
+                ctx.shadowBlur = 10;
+                ctx.fillText(`GOLDEN STARS: ${foundCount} / ${STAR_COUNT}`, 20, 410);
+                ctx.shadowBlur = 0;
+
+                if (character.isBoost) {
+                    const remaining = ((character.boostDuration - (Date.now() - character.boostStartTime)) / 1000).toFixed(1);
+                    ctx.fillStyle = '#FFFF00'; ctx.fillText(`Turbo in: ${remaining}s`, 20, 430);
+                }
+
+                ctx.fillStyle = '#888'; ctx.fillText(`World Objects (Trees): ${worldObjects.length}`, 20, 450);
+                ctx.fillStyle = '#00FFFF'; ctx.shadowColor = '#00FFFF'; ctx.shadowBlur = 10;
+                ctx.fillText(`Energy: ${collectedEnergy} / ${ENERGY_COST_TO_PLANT}`, 20, 470);
+                
+                ctx.shadowBlur = 0; ctx.fillStyle = '#FFD700'; ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 10;
+                ctx.fillText(`Aurels: ${collectedAurels}`, 20, 490);
+
+                ctx.shadowBlur = 0; ctx.fillStyle = '#9D00FF'; ctx.shadowColor = '#9D00FF'; ctx.shadowBlur = 10;
+                ctx.fillText(`Ether: ${collectedEther}`, 20, 510);
+                
+                ctx.shadowBlur = 0; ctx.fillStyle = '#555'; ctx.font = '12px Courier New';
+                ctx.fillText(`Geometric Cores: ${geometricCores.length}`, 20, 530);
+                ctx.fillText(`Position: X=${Math.round(character.x)}, Y=${Math.round(character.y)}`, 20, 550);
+            } else {
+                ctx.fillStyle = '#888'; ctx.font = '14px Courier New'; ctx.textAlign = 'left';
+                ctx.fillText('Press H to show controls', 20, 30);
+            }
+        }
+        
+        function gameLoop() {
+            try {
+                update();
+                draw();
+            } catch (e) {
+                console.error("Game Loop Error:", e);
+            }
+            requestAnimationFrame(gameLoop);
+        }
+        
+        gameLoop();
+    </script>
+</body>
+</html>
