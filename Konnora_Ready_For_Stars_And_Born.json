@@ -1,0 +1,143 @@
+{
+  "character": {
+    "x": 1000,
+    "y": 500,
+    "groundY": 600,
+    "direction": 1,
+    "velocityY": 0,
+    "isMoving": false,
+    "isJumping": false,
+    "isFloating": false,
+    "isFlyingUp": false,
+    "isFlyingDown": false,
+    "isLanding": false,
+    "isBoost": false,
+    "isTurbo": false
+  },
+  "currencies": {
+    "energy": 10000,
+    "ether": 5000,
+    "aurels": 100
+  },
+  "world": {
+    "objects": [],
+    "energyOrbs": [],
+    "etherPixels": [],
+    "grounds": [],
+    "cores": [],
+    "stars": [
+      {
+        "id": 0,
+        "x": 2200,
+        "y": 0,
+        "found": true,
+        "forestActivated": false,
+        "pulseOffset": 0,
+        "sizeVariation": 0,
+        "colorVar": 0
+      },
+      {
+        "id": 1,
+        "x": -1476,
+        "y": 1718,
+        "found": true,
+        "forestActivated": false,
+        "pulseOffset": 1,
+        "sizeVariation": 0,
+        "colorVar": 0
+      },
+      {
+        "id": 2,
+        "x": 671,
+        "y": -3105,
+        "found": true,
+        "forestActivated": false,
+        "pulseOffset": 2,
+        "sizeVariation": 0,
+        "colorVar": 0
+      },
+      {
+        "id": 3,
+        "x": 2592,
+        "y": 2855,
+        "found": true,
+        "forestActivated": false,
+        "pulseOffset": 3,
+        "sizeVariation": 0,
+        "colorVar": 0
+      },
+      {
+        "id": 4,
+        "x": -3468,
+        "y": -1115,
+        "found": true,
+        "forestActivated": false,
+        "pulseOffset": 4,
+        "sizeVariation": 0,
+        "colorVar": 0
+      },
+      {
+        "id": 5,
+        "x": 4002,
+        "y": -2544,
+        "found": true,
+        "forestActivated": false,
+        "pulseOffset": 5,
+        "sizeVariation": 0,
+        "colorVar": 0
+      },
+      {
+        "id": 6,
+        "x": -738,
+        "y": 4623,
+        "found": true,
+        "forestActivated": false,
+        "pulseOffset": 6,
+        "sizeVariation": 0,
+        "colorVar": 0
+      },
+      {
+        "id": 7,
+        "x": -3902,
+        "y": -2719,
+        "found": true,
+        "forestActivated": false,
+        "pulseOffset": 7,
+        "sizeVariation": 0,
+        "colorVar": 0
+      },
+      {
+        "id": 8,
+        "x": 3316,
+        "y": 4547,
+        "found": true,
+        "forestActivated": false,
+        "pulseOffset": 8,
+        "sizeVariation": 0,
+        "colorVar": 0
+      }
+    ]
+  },
+  "systems": {
+    "activeForests": [
+      { "x": 2200, "y": 400 },
+      { "x": -1476, "y": 2118 },
+      { "x": 671, "y": -2705 },
+      { "x": 2592, "y": 3255 },
+      { "x": -3468, "y": -715 },
+      { "x": 4002, "y": -2144 },
+      { "x": -738, "y": 5023 },
+      { "x": -3902, "y": -2319 },
+      { "x": 3316, "y": 4947 }
+    ],
+    "lastAutoSpawn": 1700000000000,
+    "lastAurelSpawn": 1700000000000,
+    "lastForestSpawn": 1700000000000,
+    "allStarsActive": false,
+    "lastStarAurelSpawn": 1700000000000,
+    "sunCircle": null,
+    "starAurels": [],
+    "allStarsCenterX": 0,
+    "allStarsCenterY": 0
+  }
+}
